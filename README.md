@@ -340,3 +340,250 @@ public class ServiceBusSubscriber : BackgroundService
     }
 
 ```
+## Azure Event Grid
+- Azure Event Grid is a fully managed event routing service that allows you to build event-driven architectures with ease. It enables you to easily route events from various sources to multiple destinations, such as Azure Functions, Logic Apps, and custom webhooks. Event Grid can handle millions of events per second and dynamically scales to meet your demands.
+- High Scalability: Capable of handling millions of events per second.
+- Versatility: Supports a variety of event sources and event handlers.
+- Event Filtering: Allows precise filtering based on event attributes.
+- Reliable Delivery: Ensures at-least-once delivery and allows custom retry policies.
+- Integration: Easily integrates with other Azure services like Azure Functions, Logic Apps, and Azure Kubernetes Service.
+### Use Cases
+- Serverless Architectures: Use Event Grid to trigger Azure Functions in response to events from various sources.
+
+- Microservices Communication: Use Event Grid to decouple microservices, allowing them to communicate through events.
+
+- Automation: Automate workflows using Logic Apps triggered by events from Event Grid.
+- Monitoring and Alerts: Send notifications or trigger actions when certain events occur in Azure services (e.g., when a new blob is created in Azure Storage).
+
+### Using Event Grid
+- Step 1: Create an Event Grid Topic
+Before you start, you need to create an Event Grid topic in the Azure Portal. Once created, you will get the endpoint URL and access key.
+
+
+- Step 2:  Install this dotnet package
+```shell
+ dotnet add package Azure.Messaging.EventGrid
+
+```
+- Step 3: Publishing Events to an Event Grid Topic
+Here is a C# example to publish events to an Event Grid topic:
+```c#
+ using System;
+using System.Text.Json;
+using Azure.Messaging.EventGrid;
+using Azure.Core;
+
+class Program
+{
+    static void Main(string[] args)
+    {
+        string endpoint = "YOUR_ENDPOINT_URL";
+        string accessKey = "YOUR_ACCESS_KEY";
+        EventGridPublisherClient client = new EventGridPublisherClient(new Uri(endpoint), new AzureKeyCredential(accessKey));
+
+        var eventGridEvent = new EventGridEvent(
+            subject: "NewEmployee",
+            eventType: "Contoso.Items.ItemReceived",
+            dataVersion: "1.0",
+            data: new { FullName = "John Doe", EmployeeID = "12345" }
+        );
+
+        client.SendEventAsync(eventGridEvent).Wait();
+        Console.WriteLine("Event published successfully.");
+    }
+}
+
+
+```
+
+- EventGridPublisherClient: Creates a client to publish events.
+- EventGridEvent: Creates an event with a subject, event type, data version, and data payload.
+- SendEventAsync: Sends the event to the Event Grid topic.
+
+- Step 4: Consuming Events from an Event Grid Topic
+- Here's an example of how to consume events from an Event Grid topic using a simple HTTP listener (e.g., Azure Function):
+- Create an Azure Function: In the Azure Portal, create an Azure Function App and add a new HTTP trigger function.
+```c#
+ using System.Collections.Generic;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Azure.WebJobs;
+using Microsoft.Azure.WebJobs.Extensions.Http;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
+using Newtonsoft.Json.Linq;
+using System.Threading.Tasks;
+
+public static class EventGridTriggerFunction
+{
+    [FunctionName("EventGridTriggerFunction")]
+    public static async Task<IActionResult> Run(
+        [HttpTrigger(AuthorizationLevel.Function, "post", Route = null)] HttpRequest req,
+        ILogger log)
+    {
+        log.LogInformation("Received Event Grid event.");
+
+        string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
+        var events = JArray.Parse(requestBody);
+
+        foreach (var eventGridEvent in events)
+        {
+            log.LogInformation($"Event Type: {eventGridEvent["eventType"]}");
+            log.LogInformation($"Event Data: {eventGridEvent["data"]}");
+        }
+
+        return new OkResult();
+    }
+}
+
+
+```
+- Azure Function: Acts as an HTTP endpoint to receive events from Event Grid.
+- StreamReader: Reads the event payload from the request body.
+- JArray: Parses the event payload to process individual events.
+- Logging: Logs event details for further processing.
+
+- Step 5: Create an Event Subscription:
+
+- In the Azure Portal, navigate to your Event Grid topic.
+- Select Event Subscriptions and then Add Event Subscription.
+- Choose Azure Function as the endpoint type.
+- Select your function app and the specific function that will handle the events.
+- Configure the subscription and save it.
+
+- Imagine you have an application that processes orders. You can use Event Grid to trigger an Azure Function whenever a new order is placed. The function can then process the order, update inventory, and send a confirmation email to the customer.
+
+- Another example when a photo is uploaded to blob storage, we trigger an event to an event grid topic which then triggers an azure function 
+
+### Step-by-Step Guide
+- 1. Create an Event Grid Topic
+- Go to the Azure Portal.
+- Navigate to Event Grid and create a new Event Grid Topic.
+- Get the Topic Endpoint and Access Key for later use.
+  
+- 2. Create an Azure Function
+- Open Visual Studio or Visual Studio Code.
+- Create a new Azure Function project:
+- Select Azure Function project template.
+- Choose C# as the language.
+- Select Azure Functions v4.
+- Choose Event Grid trigger.
+```c#
+ using System;
+using Microsoft.Azure.WebJobs;
+using Microsoft.Extensions.Logging;
+using Azure.Messaging.EventGrid;
+
+public static class ProcessPhotoFunction
+{
+    [FunctionName("ProcessPhotoFunction")]
+    public static void Run([EventGridTrigger] EventGridEvent eventGridEvent, ILogger log)
+    {
+        log.LogInformation($"Event received: {eventGridEvent.EventType}");
+        
+        if (eventGridEvent.EventType == "Microsoft.Storage.BlobCreated")
+        {
+            var blobUrl = eventGridEvent.Data.ToObjectFromJson<BlobCreatedEventData>().Url;
+            log.LogInformation($"Blob URL: {blobUrl}");
+            
+            // Add your photo processing code here (e.g., resizing, analyzing)
+        }
+    }
+}
+
+```
+
+- 3. Set Up the Storage Account and Blob Container
+- Go to the Azure Portal and navigate to your Storage Account.
+- Create a new Blob Container (e.g., "photos").
+
+- 4. Create an Event Subscription for the Blob Storage
+- Navigate to your Storage Account in the Azure Portal.
+- Select Events in the left-hand menu, then select + Event Subscription.
+- Configure the Event Subscription:
+- Name: Give your subscription a name.
+- Event Schema: Choose Event Grid Schema.
+- Event Types: Select Blob created.
+- Endpoint Type: Choose Event Grid Topic.
+- Topic Details: Provide the Topic Endpoint of your Event Grid Topic.
+- Filter: Optionally configure filters based on event types and blob paths.
+- ![alt text](image-22.png)
+  
+- 5. Upload a Photo to Blob Storage
+```c#
+ using System;
+using System.IO;
+using Azure.Storage.Blobs;
+
+class Program
+{
+    static void Main()
+    {
+        string connectionString = "YOUR_STORAGE_ACCOUNT_CONNECTION_STRING";
+        string containerName = "photos";
+        string filePath = "path/to/your/photo.jpg";
+
+        BlobServiceClient blobServiceClient = new BlobServiceClient(connectionString);
+        BlobContainerClient containerClient = blobServiceClient.GetBlobContainerClient(containerName);
+
+        // Upload the photo
+        BlobClient blobClient = container
+
+```
+- ![alt text](image-23.png)
+```c#
+ using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Azure.WebJobs;
+using Microsoft.Azure.WebJobs.Extensions.Http;
+using Microsoft.Azure.WebJobs.Extensions.EventGrid;
+using Microsoft.Extensions.Logging;
+using Newtonsoft.Json.Linq;
+using Microsoft.Azure.EventGrid.Models;
+
+public static class BlobCreatedFunction
+{
+    [FunctionName("BlobCreatedFunction")]
+    public static async Task<IActionResult> Run(
+        [EventGridTrigger] EventGridEvent eventGridEvent,
+        ILogger log)
+    {
+        log.LogInformation($"EventGridEvent received: {eventGridEvent.Data}");
+        
+        // Add your custom logic here
+
+        return new OkObjectResult("Event processed");
+    }
+}
+
+```
+- Azure Function will now be triggered whenever a blob is created in your storage account, and the event is published to your Event Grid Topic.
+
+- Event Grid uses MQTT(Message Queuing Telemetry transport) protocol for messaging
+- MQTT is suitable for low bandwidth (IoT) type environments with small message overhead.
+- RabbitMQ primarily uses the Advanced Message Queuing Protocol (AMQP) for messaging. AMQP is an open standard protocol for message-oriented middleware, designed for interoperability and reliability in message delivery. Suitable for applications requiring complex messaging patterns, transactions, and guaranteed delivery.
+Even Azure service bus also uses AMQP protocol.
+- ![alt text](image-20.png)
+- ![alt text](image-21.png)
+- Use Azure Event Grid if you need a lightweight, event-driven solution that reacts to changes in data or state across your services.
+- Use Azure Service Bus if you need reliable messaging with advanced features and complex messaging patterns.
+- Azure Event Grid:
+- Purpose: Ideal for event-driven architectures, where you react to changes in data or state across services.
+- Model: Push model, events are sent to event handlers as they are generated.
+- Integration: Deep integration with Azure services and custom applications.
+- Usage: Used for lightweight notifications and near real-time event delivery.
+- Scalability: Automatically scales based on traffic.
+- Cost: Charges based on operations used, with a free tier for the first 100,000 operations per month.
+- Features: Supports retry policies, dead-lettering, and fan-out patterns.
+- Best For: Scenarios requiring minimal latency and high throughput.
+- Azure Service Bus:
+- Purpose: Reliable messaging service for complex messaging patterns and enterprise scenarios.
+- Model: Pull model, where subscribers actively poll topic subscriptions for messages.
+- Integration: Often used for enterprise applications and solutions requiring ordered delivery, transactions, or sessions.
+- Usage: Used for processing raw data messages and command messages.
+Scalability: Supports partitioning and can handle multiple subscribers and publishers.
+- Cost: Charges based on message operations and additional features like storage.
+- Features: Advanced features like transactions, duplicate detection, message deferral, and scheduled delivery.
+-Best For: Workflows that require robust, feature-rich messaging capabilities.
+Summary:
+- Event Grid is best for lightweight, serverless, real-time event notification and processing.
+- Service Bus is best for complex, reliable messaging with advanced features and enterprise-level handling.
