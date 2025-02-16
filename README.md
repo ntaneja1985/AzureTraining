@@ -587,3 +587,12 @@ Scalability: Supports partitioning and can handle multiple subscribers and publi
 Summary:
 - Event Grid is best for lightweight, serverless, real-time event notification and processing.
 - Service Bus is best for complex, reliable messaging with advanced features and enterprise-level handling.
+## Healthcare Monitoring
+- Scenario: A hospital collects real-time data from patient monitoring devices and needs to trigger alerts for critical conditions while storing the data for analysis.
+
+- Solution:
+- Use Event Hubs to ingest patient data from monitoring devices.
+- Use Event Grid to route critical events (e.g., abnormal heart rate) to Azure Functions for immediate alerts to medical staff.
+- Use Azure Stream Analytics to analyze trends and store data in a data lake for long-term analysis.
+- Real-Life Example: A hospital like Mayo Clinic or Johns Hopkins using IoT to monitor patients in real-time.
+- ![alt text](image-24.png)
