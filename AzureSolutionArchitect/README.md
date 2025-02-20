@@ -639,6 +639,409 @@ public static string SayHello([ActivityTrigger] string name, ILogger log)
 - ![alt text](image-157.png)
 - ![alt text](image-158.png)
 
+## Running Azure Functions with various Triggers and updating Azure Sql Server Database
+- Consider the following scenarios 
+- We need a function to run when a blob is uploaded, to resize the blob and update its status in the database. 
+- In this case consider the following local.settings.json file 
+- Use local.settings.json for local development only. Do not deploy this file to production.
+```json
+{
+    "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "DefaultEndpointsProtocol=https;AccountName=azuredotnetmastery;AccountKey=dEnt4cnUh3nHyfPhL7F3Bw+ZAbpN7g34r5YPxI+BOFqscvcLSsGh+CckIBkMr3fqd/KmoNz/vCDaHqIyqdl77w==;EndpointSuffix=core.windows.net",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet",
+    //"AzureSqlDatabase": "Server=tcp:dotnetmasterysqlserver.database.windows.net,1433;Initial Catalog=dotnetmastery-azureSQL;Persist Security Info=False;User ID=admin-sql;Password=DotnetMastery1;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;",
+    "AzureSqlDatabase": "Server=(localdb)\\mssqllocaldb;Database=AzureDotNetMasterySQL;Trusted_Connection=True;MultipleActiveResultSets=true",
+    "CustomSendGridKeyAppSettingName": "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"
+  }
+}
+
+```
+- Also consider the following Startup.cs file to setup the DbContext for the Azure SQL Server Database
+```c#
+﻿using AzureTangyFunc;
+using AzureTangyFunc.Data;
+using Microsoft.Azure.WebJobs;
+using Microsoft.Azure.WebJobs.Hosting;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+
+
+[assembly: WebJobsStartup(typeof(Startup))]
+namespace AzureTangyFunc
+{
+    public class Startup : IWebJobsStartup
+    {
+        public void Configure(IWebJobsBuilder builder)
+        {
+            string connectionString = Environment.GetEnvironmentVariable("AzureSqlDatabase");
+
+            builder.Services.AddDbContext<AzureTangyDbContext>(
+                options => options.UseSqlServer(connectionString));
+
+            builder.Services.BuildServiceProvider();
+        }
+    }
+}
+
+```
+- We need to include the following references in the Azure Functions project 
+```c#
+ <PackageReference Include="Microsoft.Azure.WebJobs.Extensions.SendGrid" Version="3.0.2" />
+    <PackageReference Include="Microsoft.Azure.WebJobs.Extensions.Storage" Version="5.0.0-beta.5" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="6.0.0-rc.1.21452.10" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="6.0.0-rc.1.21452.10" />
+    <PackageReference Include="Microsoft.NET.Sdk.Functions" Version="4.0.0-preview2" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="1.0.4" />
+
+```
+- Then we define the Azure Function to run with Blob Trigger as follows to update the status in the database:
+```c#
+ namespace AzureTangyFunc
+{
+    public class BlobResizeTriggerUpdateStatusInDb
+    {
+        private readonly AzureTangyDbContext _db;
+        public BlobResizeTriggerUpdateStatusInDb(AzureTangyDbContext db)
+        {
+            _db = db;
+        }
+
+        [FunctionName("BlobResizeTriggerUpdateStatusInDb")]
+        public void Run([BlobTrigger("functionsalesrep-sm/{name}", Connection = "AzureWebJobsStorage")]Stream myBlob, 
+            string name, ILogger log)
+        {
+            log.LogInformation($"C# Blob trigger function Processed blob\n Name:{name} \n Size: {myBlob.Length} Bytes");
+
+            var fileName = Path.GetFileNameWithoutExtension(name);
+            SalesRequest salesRequestFromDb = _db.SalesRequests.FirstOrDefault(u => u.Id == fileName);
+            if (salesRequestFromDb != null)
+            {
+                salesRequestFromDb.Status = "Image Processed";
+                _db.SalesRequests.Update(salesRequestFromDb);
+                _db.SaveChanges();
+            }
+        }
+    }
+}
+
+
+```
+
+- We can have an azure function to resize an image on Blob Upload as follows: 
+```c#
+ namespace AzureTangyFunc
+{
+    public static class ResizeImageOnBlobUpload
+    {
+        [FunctionName("ResizeImageOnBlobUpload")]
+        public static void Run([BlobTrigger("functionsalesrep/{name}", Connection = "AzureWebJobsStorage")]Stream myBlob,
+            [Blob("functionsalesrep-sm/{name}", FileAccess.Write)] Stream myBlobOutput,
+            string name, ILogger log)
+        {
+            log.LogInformation($"C# Blob trigger function Processed blob\n Name:{name} \n Size: {myBlob.Length} Bytes");
+
+            using Image<Rgba32> input = Image.Load<Rgba32>(myBlob, out IImageFormat format);
+            input.Mutate(x => x.Resize(300, 200));
+            input.Save(myBlobOutput, format);
+        }
+    }
+}
+
+
+```
+- We can have an Http trigger function that adds an item to the Queue on a POST request
+```c#
+ namespace AzureTangyFunc
+{
+    public static class OnSalesUploadWriteToQueue
+    {
+        [FunctionName("OnSalesUploadWriteToQueue")]
+        public static async Task<IActionResult> Run(
+            [HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)] HttpRequest req,
+            [Queue("SalesRequestInBound",Connection ="AzureWebJobsStorage")] IAsyncCollector<SalesRequest> salesRequestQueue,
+            ILogger log)
+        {
+            log.LogInformation("Sales Request received by OnSalesUploadWriteToQueue function");
+
+           
+
+            string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
+            SalesRequest data = JsonConvert.DeserializeObject<SalesRequest>(requestBody);
+
+            await salesRequestQueue.AddAsync(data);
+
+            string responseMessage = "Sales Request has been received for ." + data.Name;
+            return new OkObjectResult(responseMessage);
+        }
+    }
+}
+
+```
+- We can have a Queue trigger function to process a Queue item and add it to the database like this 
+```c#
+ namespace AzureTangyFunc
+{
+    public class OnQueueTriggerUpdateDatabase
+    {
+        private readonly AzureTangyDbContext _db;
+
+        public OnQueueTriggerUpdateDatabase(AzureTangyDbContext db)
+        {
+            _db = db;
+        }
+
+
+        [FunctionName("OnQueueTriggerUpdateDatabase")]
+        public void Run([QueueTrigger("SalesRequestInBound", Connection = "AzureWebJobsStorage")]SalesRequest myQueueItem, 
+            ILogger log)
+        {
+            log.LogInformation($"C# Queue trigger function processed: {myQueueItem}");
+
+            myQueueItem.Status = "Submitted";
+            _db.SalesRequests.Add(myQueueItem);
+            _db.SaveChanges();
+
+
+        }
+    }
+}
+
+```
+- We can also have a Timer Trigger Azure Function that at certain intervals checks the Sales Request Table in the Azure Sql Database and sends an email using SendGrid and updates the status in the database
+
+```c#
+public  class UpdateStatusToCompletedAndSendEmail
+    {
+        private readonly AzureTangyDbContext _db;
+        public UpdateStatusToCompletedAndSendEmail(AzureTangyDbContext db)
+        {
+            _db = db;
+        }
+
+        [FunctionName("UpdateStatusToCompletedAndSendEmail")]
+        public async Task Run([TimerTrigger("0 */5 * * * *")]TimerInfo myTimer,
+            [SendGrid(ApiKey = "CustomSendGridKeyAppSettingName")] IAsyncCollector<SendGridMessage> messageCollector, ILogger log)
+        {
+            log.LogInformation($"C# Timer trigger function executed at: {DateTime.Now}");
+
+            IEnumerable<SalesRequest> salesRequestFromDb = _db.SalesRequests.Where(u => u.Status == "Image Processed");
+            foreach (var salesReq in salesRequestFromDb)
+            {
+                //for each request update status
+                salesReq.Status = "Completed";
+            }
+
+            _db.UpdateRange(salesRequestFromDb);
+            _db.SaveChanges();
+
+            var message = new SendGridMessage();
+            message.AddTo("dotnetmastery@gmail.com");
+            message.AddContent("text/html", $"Processing completed for {salesRequestFromDb.Count()} records");
+            message.SetFrom(new EmailAddress("hello@dotnetmastery.com"));
+            message.SetSubject("Azure Tangy Processing Successful");
+            await messageCollector.AddAsync(message);
+        }
+    }
+
+```
+- We can also use Azure Functions to host and run a WebAPI as follows:
+```c#
+ public class GroceryAPI
+    {
+        private readonly AzureTangyDbContext _db;
+
+        public GroceryAPI(AzureTangyDbContext db)
+        {
+            _db = db;
+        }
+
+
+        [FunctionName("CreateGrocery")]
+        public async Task<IActionResult> CreateGrocery(
+            [HttpTrigger(AuthorizationLevel.Function, "post", Route = "GroceryList")] HttpRequest req,
+            ILogger log)
+        {
+            log.LogInformation("Creating Grocery List Item.");
+
+            
+            string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
+            GroceryItem_Upsert data = JsonConvert.DeserializeObject<GroceryItem_Upsert>(requestBody);
+
+            var groceryItem = new GroceryItem
+            {
+                Name = data.Name
+            };
+
+            _db.GroceryItems.Add(groceryItem);
+            _db.SaveChanges();
+
+            return new OkObjectResult(groceryItem);
+        }
+
+        [FunctionName("GetGrocery")]
+        public async Task<IActionResult> GetGrocery(
+           [HttpTrigger(AuthorizationLevel.Function, "get", Route = "GroceryList")] HttpRequest req,
+           ILogger log)
+        {
+            log.LogInformation("Getting all Grocery List Item.");
+
+            return new OkObjectResult(_db.GroceryItems.ToList());
+        }
+
+        [FunctionName("GetGroceryById")]
+        public async Task<IActionResult> GetGroceryById(
+         [HttpTrigger(AuthorizationLevel.Function, "get", Route = "GroceryList/{id}")] HttpRequest req,
+         ILogger log, string id)
+        {
+            log.LogInformation("Getting Grocery List Item by ID.");
+            var item = _db.GroceryItems.FirstOrDefault(u => u.Id == id);
+            if (item == null)
+            {
+                return new NotFoundResult();
+            }
+
+            return new OkObjectResult(item);
+        }
+
+
+        [FunctionName("UpdateGrocery")]
+        public async Task<IActionResult> UpdateGrocery(
+           [HttpTrigger(AuthorizationLevel.Function, "put", Route = "GroceryList/{id}")] HttpRequest req,
+           ILogger log, string id)
+        {
+            log.LogInformation("Updatind Grocery List Item.");
+            var item = _db.GroceryItems.FirstOrDefault(u => u.Id == id);
+            if (item == null)
+            {
+                return new NotFoundResult();
+            }
+
+            string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
+            GroceryItem_Upsert updatedData = JsonConvert.DeserializeObject<GroceryItem_Upsert>(requestBody);
+
+            if (!string.IsNullOrEmpty(updatedData.Name))
+            {
+                item.Name=updatedData.Name;
+                _db.GroceryItems.Update(item);
+                _db.SaveChanges();
+            }
+
+            return new OkObjectResult(item);
+        }
+
+        [FunctionName("DeleteGrocery")]
+        public async Task<IActionResult> DeleteGrocery(
+           [HttpTrigger(AuthorizationLevel.Function, "delete", Route = "GroceryList/{id}")] HttpRequest req,
+           ILogger log, string id)
+        {
+            log.LogInformation("Delete Grocery List Item.");
+
+
+            var item = _db.GroceryItems.FirstOrDefault(u => u.Id == id);
+            if (item == null)
+            {
+                return new NotFoundResult();
+            }
+            _db.GroceryItems.Remove(item);
+            _db.SaveChanges();
+
+            return new OkResult();
+        }
+    }
+
+```
+
+## Setting up Security in Azure Functions 
+- Setting up security in Azure Functions involves several best practices to ensure your function app is secure. Here are some key steps:
+ 1. Enable Managed Identity
+ Managed identities provide an identity for your function app in Azure Active Directory (AAD), which can be used to access other Azure resources securely.
+
+ 2. Use Azure API Management (APIM)
+ APIM can be used to authenticate and authorize requests to your function app, providing an additional layer of security.
+
+ 3. Deploy to a Virtual Network (VNet)
+ Deploying your function app to a VNet allows you to isolate it from the public internet and control network access using Network Security Groups (NSGs).
+
+ 4. Enable App Service Authentication/Authorization
+ This feature allows you to secure your function app using Azure Active Directory, OAuth 2.0, or other authentication providers.
+
+ 5. Use Environment Variables for Secrets
+ Store sensitive information like connection strings and API keys in environment variables rather than hardcoding them into your function code.
+
+ 6. Enable Application Insights
+ Integrate Application Insights to monitor and detect security threats, performance issues, and operational problems.
+
+ 7. Implement Role-Based Access Control (RBAC)
+ Use RBAC to control who has access to your function app and what they can do with it.
+
+ 8. Regularly Update and Patch
+ Ensure that your function app and its dependencies are regularly updated to protect against vulnerabilities.
+ 9. Using Azure Key Vault
+   - Using Azure Key Vault in Azure Functions allows you to securely store and manage secrets, such as connection strings and API keys, and access them from your function app.
+   - Enable System-Assigned Managed Identity: In the Azure Portal, navigate to your Function App, go to Identity, and enable System-assigned Managed Identity.
+   - Assign Roles: Assign the necessary roles to the managed identity to allow it to access the Key Vault. Typically, you would assign the Key Vault Secrets User role.
+   - Add Key Vault References: In the Azure Portal, navigate to your Function App, go to Configuration, and add new application settings
+   - Use Key Vault References: Use the format @Microsoft.KeyVault(SecretUri=<secret-uri>) to reference secrets stored in the Key Vault
+   - We can access secrets inside Function App code like this: 
+```c#
+   using System;
+using System.Net.Http;
+using System.Threading.Tasks;
+
+public static class MyFunction
+{
+    [FunctionName("MyFunction")]
+    public static async Task<IActionResult> Run(
+        [HttpTrigger(AuthorizationLevel.Function, "get", "post")] HttpRequest req,
+        ILogger log)
+    {
+        log.LogInformation("Accessing secret from Key Vault");
+
+        var secretValue = Environment.GetEnvironmentVariable("MySecret", EnvironmentVariableTarget.Process);
+        log.LogInformation($"Secret value: {secretValue}");
+
+        return new OkObjectResult($"Secret value: {secretValue}");
+    }
+}
+
+```
+- Example Configuration in host.json
+- Here’s an example of how you might configure some of these security features in your host.json file:
+```json
+
+{
+  "version": "2.0",
+  "extensions": {
+    "durableTask": {
+      "hubName": "MyTaskHub"
+    }
+  },
+  "logging": {
+    "logLevel": {
+      "Function": "Information"
+    }
+  },
+  "functionTimeout": "00:10:00",
+  "networking": {
+    "virtualNetworkName": "MyVNet",
+    "subnet": "MySubnet"
+  },
+  "security": {
+    "enableAuthentication": true,
+    "authenticationProvider": "AzureActiveDirectory"
+  },
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet",
+    "MySecret": "@Microsoft.KeyVault(SecretUri=https://mykeyvault.vault.azure.net/secrets/MySecret/)"
+  }
+}
+```
+
+
+
 ## How to choose the Compute Type 
 - ![alt text](image-159.png)
 - More Azure Compute Options are Logic Apps, ACI(Azure Container Instance), App Service Container(Deploy container image to App Service)
