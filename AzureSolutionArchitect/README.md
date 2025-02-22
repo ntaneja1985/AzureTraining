@@ -1048,5 +1048,420 @@ public static class MyFunction
 
 
 ## Azure Networking
+- Deals with resource's network connections, firewalls etc. 
+- Foundation of Cloud Security. 
+- ![alt text](image-160.png)
+
+## Virtual Networks(VNets)
+- A network in which we can deploy our cloud resources
+- Many cloud resources are deployed within VNets
+- Examples are VMs, AppServices, DBs etc. 
+- Virtual is based on a physical network, but is logically separated from other virtual networks. 
+- Resources in a single VNet can communicate with each other by default, but cannot communicate with other resources in other VNets. 
+- ![alt text](image-161.png)
+- Think of it as our organizations are their private network. 
+- In AWS, it is called Virtual Private Cloud(VPC)
+- VNets are free, but there is a limit of 50 VNets per subscription across all regions. 
+- VNet is scoped to a single region. 
+- VNet cannot span multiple regions. 
+- VNet is scoped to a single subscription
+- Different VNets can be connected by something through Peering.
+- VNets are segmented using Subnets 
+- VNets are protected using NSG(on the subnets)
+- NSG is defined on the subnet not on the VNet. 
+- ![alt text](image-162.png)
+- Each VNet has its own address range or IP Range
+- Spans 65,536 addresses. 
+- All network devices must be in this address range. 
+- It is expressed using CIDR notation. 
+
+## CIDR Notation 
+- Classless Inter-Domain Routing. 
+- It is a method for representing an IP Range. 
+- Composed of an address in the range and a number between 0 and 32 
+- The number indicates the number of bits that are allocated to the address.
+- Smaller the number-larger the range. 
+- ![alt text](image-163.png)
+- ![alt text](image-164.png)
+- For 20 bits
+- ![alt text](image-165.png)
+- Lot of CIDR calculators.
+- ![alt text](image-166.png)
+
+## Subnets
+- Logical segment in the VNet
+- Shares a subset of the VNet's IP Range. 
+- Used as a logical group of resources in the Vnet. 
+- Is a must. Resources must be placed in a subnet, cannot be placed directly in the Vnet. 
+- Resources in a subnet can talk to resources to resources in other subnets in the same VNet. 
+- However, this can be customized. 
+- ![alt text](image-167.png)
+- Each subnet gets a share of the parent Vnet's IP Range.
+- NEVER use the full range of the Vnet in a subnet. 
+- Once we pick the address range of the subnet, it is very hard to modify it later. Also makes it hard to add future subnets. 
+- Subnets are free 
+- Limit of 3000 subnets per Vnet. 
+- ![alt text](image-169.png)
+- ![alt text](image-170.png)
+- ![alt text](image-171.png)
+- ![alt text](image-172.png)
+- ![alt text](image-173.png)
+- Here Network Interface is the Virtual Network Card. 
+### Unless peering is done, devices placed in different VNets cannot communicate with each other
+
+### what is the advantage of placing the webapp and backend service and database in different vnets
+- Placing the web app, backend service, and database in different Virtual Networks (VNets) in Azure, connected via VNet peering, offers several advantages from a security, organization, scalability, and management perspective.
+- **Network Segmentation**: By isolating the web app, backend service, and database into separate VNets, you reduce the attack surface. If one layer (e.g., the web app) is compromised, the attacker doesn’t automatically gain access to the backend or database.
+- **Granular Access Control**: You can apply Network Security Groups (NSGs) and firewall rules specific to each VNet. For example:
+The web app VNet might allow inbound traffic from the internet on port 80/443.
+The backend VNet might only allow traffic from the web app VNet.
+The database VNet might only permit traffic from the backend VNet on specific ports (e.g., 1433 for SQL).
+- **Defense in Depth**: Separating tiers into VNets aligns with a layered security approach, making it harder for threats to propagate.
+- Delegation: In large organizations, different teams (e.g., frontend devs, backend devs, DBAs) can manage their own VNets, reducing dependencies and conflicts.
+- Independent Scaling: Each VNet can scale independently. For example:
+- The web app VNet might need more subnets for load-balanced VMs or App Services.
+- The database VNet might need a larger address space for replicas or clusters.
+- **Controlled Communication**: With VNet peering, you can fine-tune how traffic flows between tiers. For instance, you can disable forwarded traffic or restrict Gateway Transit to ensure the database VNet isn’t exposed to external networks unnecessarily.
+- **Reduced Congestion**: By isolating traffic within each VNet, you minimize the risk of one tier’s network load (e.g., a web app under DDoS attack) impacting the others.
+- **Regulatory Compliance**: Many industries (e.g., finance, healthcare) require strict separation of data and application layers. Placing the database in its own VNet helps meet these requirements by isolating sensitive data.
+- Fault Isolation: If one VNet experiences an issue (e.g., misconfiguration or outage), the others can remain operational. For example, a web app VNet failure doesn’t necessarily bring down the database.
+- A **DDoS attack on the web app** doesn’t directly affect the backend or database due to NSG rules and VNet isolation.
+
+
+## Network Security Group(NSG)
+- Gatekeeper for Subnets
+- Defines who can connect in and out of Subnet
+- Think of it as mini-firewall 
+- Standard part of subnet creation. 
+- Is Free of cost
+- It works by looking at 5 tuples:
+- Source(Where the connection came from), Source Port(The port the source is using), Destination(Where does the connection request go), Destination Port(To which port it wants to connect), Protocol(Whether it uses TCP, UDP or both)
+- Based on these 5 tuples, connection is either allowed or denied. 
+- This is called Security Rule. 
+- Each rule is assigned a number
+- Lower the number, higher the priority of the rule. 
+- NSG is automatically created and attached to every newly created VM's network interface.
+- NSG of a VM automatically opens RDP(on windows) or SSH(on Linux) port to anyone.
+- It must be handled first thing after creation. 
+- We dont want to leave RDP or SSH ports open to the world. 
+- ![alt text](image-174.png)
+- In NSG we have inbound port rules and outbound port rules. 
+- Note that higher the number of priority, lower is the priority of the rule. 
+- Also note the only rule with priority of 300 means that RDP connection can be made using TCP protocol over port 3389. Since it is the lowest number of priority, it has the highest priority.
+- ![alt text](image-175.png)
+- ![alt text](image-176.png)
+- We can make our RDP connection more secure by finding out our IP address and allowing the source to be IP Address and specifying our IP in the Source IP Address field so that only we can connect to the VM from our IP only. 
+- ![alt text](image-177.png)
+- To allow traffic over port 8080, we need to open that port using the NSG. 
+- Remember our app is deployed over port 8080, so now we should be able to access the application running on port 8080.
+- ![alt text](image-178.png)
+### Please note NSG rules affect external access only, within the private subnet, the devices should still be able to connect with each other. Only traffic from outside world is filtered. Traffic between the subnet is still allowed. 
+- To change the subnet for a particular VM, go to the network interface for the VM and select the new subnet. This will restart the VM to use the new subnet.
+- ![alt text](image-179.png)
+- Note the private IP Address of the VM is now changed. 
+- Different resources in different subnets but within the same VNet can still communicate with each other. 
+- We can attach the NSG either to a subnet or a VM
+- ![alt text](image-180.png)
+
+## Network Peering
+- Sometimes, to increase security, we want to place some resources in a completely different Vnet not just Subnet. 
+- Examples are separate systems, separate layers like FrontEnd in one Vnet, backend in a different Vnet and Database in a different Vnet. 
+- Basically, we dont want to place non-public resources in a Vnet that has public access. 
+- ![alt text](image-181.png)
+- Place sensitive resources in different Vnets. 
+- ![alt text](image-182.png)
+- ![alt text](image-183.png)
+- To solve the problem of communication between 2 different Vnets, we have network peering.
+- It allows 2 Vnets to connect to each other
+- From the user's point of view, it is single Vnet. 
+- Just make sure address spaces are not overlapped. 
+- Use NSG for protection. 
+- Peering can work across regions. 
+- Remember, Vnet is limited to a single region
+- Using Peering, we can make a Vnet that spans across several regions 
+- Peering is NOT FREE!
+- ![alt text](image-184.png)
+- ![alt text](image-185.png)
+- While deleting a VM, we can choose not to delete the OS Disk so that we can move that disk across Vnets when recreating the VM with the same disk across a different Vnet. 
+- ![alt text](image-186.png)
+- In the above if we try to access the weather API in a different Vnet from an application in a different Vnet, it will give the above connection timed out error, as without network peering, we cannot connect across Vnets. 
+- To setup network peering, we need to go our Vnet and select Peerings. 
+- ![alt text](image-187.png)
+- ![alt text](image-189.png)
+- ![alt text](image-190.png)
+- We already have a rule in NSG that for a peered Vnet, we can connect to this VM.
+- But this is not a best practice.
+- We add another inbound rule that any other custom service cannot connect to port 8080. 
+- ![alt text](image-191.png)
+- We will get the private IP Address of catalog VM and then add a new inbound rule in the weather VM NSG, that will allow only this private IP Address to access this weather VM.
+- ![alt text](image-192.png)
+
+
+## Network Topology
+- We have something called Network Watcher. 
+- ![alt text](image-193.png)
+- Helps us to visualize the topology of our network. 
+- ![alt text](image-194.png)
+- We can see the peerings between the Vnets. 
+- If we click on + button for a Vnet we can see the subnets and NSGs inside the Vnet. 
+- ![alt text](image-195.png)
+- Topology Viewer gives a good high level view of the topology in our Azure environment. 
+- ![alt text](image-196.png)
+
+## Securing the VM Access
+- ![alt text](image-197.png)
+- Both the Catalog VM and Weather API expose public IPs and can be exploited. 
+- The larger the attack surface, the greater the risk 
+- Leaving public IPs open, is always a risk, which we want to avoid. 
+- ![alt text](image-198.png)
+### JIT Access
+- Just in Time Access
+- Open the port for access on demand and automatically close it. 
+- Allows access for a limited time.
+- Rest of the time - it is closed. 
+- Can be configured from VM page's in the portal.
+- Requires Security Center License Upgrade. 
+- ![alt text](image-199.png)
+### VPN
+- Secure tunnel to the VNet.
+- Can be configured so that no one else can connect to the VNet. 
+- Requires VPN Software and license(not part of Azure)
+- Makes setup more complicated and expensive
+### Jumpbox
+- Place another VM in the Vnet
+- Allow access only to this Vnet.
+- When we need to access one of the other VMs, connect to this one and connect from it to the relevant VM.
+- Only one port is open(still kind of a problem...)
+- Cost is only the additional VM(the Jumpbox)
+- ![alt text](image-200.png)
+### Bastion
+- A web based connection to the VM
+- No open port is required
+- Simple and secure
+- Costs around 140$/ month. 
+
+## Using Bastion
+- ![alt text](image-201.png)
+- Also adds a subnet to the Vnet
+- ![alt text](image-202.png)
+- No need for RDP connection and expose a port. 
+- Azure Bastion is a fully managed platform-as-a-service (PaaS) service that provides secure and seamless RDP/SSH connectivity to your virtual machines directly over TLS from the Azure portal or via the native SSH or RDP client on your local computer.
+- It eliminates the need for a public IP address on your virtual machines and simplifies network security management.
+
+
+## Service Endpoint
+- A lot of managed services expose Public IP
+- examples include Azure Sql Server, App Services, Storage etc. 
+- Sometimes these resources are accessed only from resources in the cloud i.e Database in the backend.
+- All of this expose security risks 
+- Service Endpoint solves this security risk
+- Creates a route from the Vnet to the managed service. 
+- Traffic never leaves Azure backbone although the resource still has a public IP. 
+- Access from the internet can be blocked.
+- Good thing it is free.
+- Enable Service Endpoint on the subnet from which we want to access the resource. 
+- On the resource, set the subnet as the source of traffic. 
+- ![alt text](image-203.png)
+- ![alt text](image-204.png)
+- Resources that support Service endpoint are Storage, PostgresSql, CosmosDb, Key Vault, Service Bus, Event Hub, App Service, Cognitive Services. 
+
+
+## Private Link
+- A lot of managed services expose Public IP
+- examples include Azure Sql Server, App Services, Storage etc. 
+- Sometimes these resources are accessed only from resources in the cloud i.e Database in the backend.
+- All of this expose security risks 
+- A newer solution and better solution to this problem. 
+- It extends the managed service into the Vnet.
+- Traffic never leaves the Vnet.
+- Access from the internet can be blocked. 
+- Can be used from on-prem networks.
+- However, it isnt free. 
+- ![alt text](image-205.png)
+- ![alt text](image-206.png)
+- ![alt text](image-208.png)
+- ![alt text](image-209.png)
+
+## Service Endpoint vs Private Link 
+- ![alt text](image-210.png)
+
+## App Service Vnet integration.
+- Allows access from App Service to resources within Vnet so that resources are not exposed on the internet
+- Extremely useful when App Service needs access to a VM with some internal resources. 
+- Supports same region Vnets. For Vnets in other regions - a gateway is required.  
+- ![alt text](image-211.png)
+- ![alt text](image-212.png)
+- ![alt text](image-213.png)
+
+
+## App Service Access Restrictions
+- Similar to NSG - but for App Services
+- Restricts traffic to App Services
+- By default all inbound traffic is allowed to the relevant ports 
+- Using access restrictions, inbound traffic is restricted to the allowed IPs/Vnets/Service Tags(general name for an azure managed service like loadbalancer, application gateway) 
+- Main Use Cases: 
+- ![alt text](image-215.png)
+- ![alt text](image-216.png)
+- ![alt text](image-218.png)
+
+## App Service Environment(ASE)
+- This is a special type of app service deployed directly to a dedicated Vnet. 
+- Vnet can be configured like any other Vnet - Subnets, NSGs etc. 
+- Created on dedicated hardware. 
+- In standard tiers of App Service, we cannot place it inside a specific Vnet. 
+- Quite expensive. 
+- 1000$/month. 
+- Has superb scaling capabilities. 
+- ![alt text](image-219.png)
+- ![alt text](image-220.png)
+- ![alt text](image-221.png)
+
+
+## Load Balancer
+- Azure services that distributes load and checks health of the VMs.
+- When VM is not healthy, no traffic is directed to it. 
+- Can work with VMs or Scale Set. 
+- Can be public or private. 
+- Operates at layer 4 of OSI Model 
+- ![alt text](image-223.png)
+- ![alt text](image-224.png)
+- ![alt text](image-225.png)
+- Same tuples are used by NSG. 
+- ![alt text](image-226.png)
+- ![alt text](image-227.png)
+- ![alt text](image-229.png)
+- ![alt text](image-230.png)
+- ![alt text](image-231.png)
+- ![alt text](image-232.png)
+- ![alt text](image-233.png)
+- ![alt text](image-234.png)
+
+## Application Gateway 
+- Web Traffic Load balancer with improved web capabilities. 
+- Can function as the external endpoint of the webapp.
+- Works with VMs, VM Scale Sets
+- Also supports App Services and K8s 
+- Similar to Load balancer but has few advanced features:
+- SSL Termination, Autoscaling, Zone redundancy, Session affinity, URL based routing, Websocket and HTTP/2 support, Custom error pages, Header and URL Rewriting, WAF 
+- URL based routing allows us to route requests based on path. 
+- Operates at layer 7 of OSI Model 
+- It can see the content of the transmission which cannot be done on Load Balancer.
+- ![alt text](image-235.png)
+- Most important thing is WAF 
+- ![alt text](image-237.png)
+- In prevention mode, WAF will block incoming traffic. 
+- ![alt text](image-238.png)
+- ![alt text](image-239.png)
+- App GW must be placed in its own subnet.
+- Often in its own Vnet. 
+- Must make sure backend resources are accessible from App GW Subnet. 
+- ![alt text](image-241.png)
+- ![alt text](image-242.png)
+- ![alt text](image-245.png)
+- Just make sure Address spaces of the Vnet created for App GW and the other VMs are not overlapping.
+- This is because we are going to peer both the Vnets. 
+- ![alt text](image-246.png)
+- ![alt text](image-247.png)
+- ![alt text](image-248.png)
+- ![alt text](image-249.png)
+- Define routing rules
+- ![alt text](image-250.png)
+- ![alt text](image-251.png)
+- ![alt text](image-252.png)
+- ![alt text](image-253.png)
+- Now create the application gateway
+- ![alt text](image-254.png)
+- ![alt text](image-255.png)
+- To protect the App Service, we will use Service Endpoint(alternatively we can use Private Link) 
+- ![alt text](image-257.png)
+- Now go to App Service 
+- Go to Networking and use Access Restrictions to allow traffic only from the service endpoint created above
+- ![alt text](image-258.png)
+- ![alt text](image-259.png)
+- Now access restrictions are setup on the Azure App Service, so now we cannot access the App Service from the internet directly.
+- Only way to access it is from the Application Gateway.
+
+## Connecting to VM from Application Gateway 
+- Our VM is in a different Vnet
+- So we need to first define peering between the App GW Vnet and this VM's Vnet 
+- ![alt text](image-260.png)
+- ![alt text](image-261.png)
+- Copy the private IP Address of the VM 
+- In the App GW, go to Backend pools 
+- Go to catalog pool 
+- Copy the private IP Address of catalog VM
+- ![alt text](image-262.png)
+- Go to the Network Settings of VM in the NSG and disable the inbound rule for port 8080
+- ![alt text](image-263.png)
+- We just need this rule:
+- ![alt text](image-264.png)
+- Now we can access the catalog VM using the App GW only and not using the VM's IP Address
+- All traffic to Catalog VM can only come through the Application Gateway. 
+
+## Application Gateway and AKS 
+- No built-in integration with AKS 
+- AKS has its own gateway( called services)
+- There is an Application Gateway Ingress Controller (AGIC) that does this 
+- One alternative to App GW is using nginx ingress controller. 
+
+## Application Gateway and Function Apps 
+- Function Apps are basically App Services only 
+- They can be protected by App GW in the same way as App Services 
+- We can configure them in Backend pool and then setup Access Restrictions. 
+
+## Current Architecture so far 
+- ![alt text](image-265.png)
+
+## Affinity (in Application Gateway)
+- ![alt text](image-266.png)
+- This setting makes sure user will always be directed to the same instance(VM/App Service) it began with. 
+- Feature should be avoided wherever possible as this will result in one instance being overloaded and others being idle
+- Usually used in Stateful apps and is a sign a bad design. 
+- Always try to design stateless apps. 
+
+## Stateless Architecture
+- Here the application's state is stored in only 2 places: the data store and the user interface. 
+- No state is stored in application code. 
+- State = Application data 
+- ![alt text](image-267.png)
+- However this is problematic. 
+- One of the problems is scalability.
+- Another problem is redundancy(Allows the system to function properly when resource is not working)
+- ![alt text](image-268.png)
+- Our architecture must look like this 
+- ![alt text](image-270.png)
+- Stateful applications have a hard time with both scalability and redundancy. 
+- ![alt text](image-271.png)
+- ![alt text](image-272.png)
+- In a stateless architecture we can route the same request as follows:
+- ![alt text](image-273.png)
+- Always use stateless architecture. 
+- Supports scalability and redundancy. 
+
+
+## Application Gateway and Cookies 
+- Usually in front of the App GW, we also have a DNS Server. This DNS Server defines the DNS name of the Web App
+- ![alt text](image-274.png)
+- What happens when a user tries to browse this website?
+- ![alt text](image-275.png)
+- In the above scenario, the App Service sends a cookie in the response and it has the domain name of the App Service.
+- In this case, the cookie will be dropped by the browser as there is domain name mismatch between the domain name set by DNS and the one defined by the App Service
+- ![alt text](image-276.png)
+- ![alt text](image-277.png)
+- We need to set the domain name of the App Service to the domain name defined by the DNS of App GW 
+
+## Secure Network Design 
+- Each layer in the application has its own Vnet. 
+- Access to resources must be extremely limited.
+- ![alt text](image-278.png)
+- Also called Hub and Spoke Model. 
+- All connections must go through a NSG. 
+
+### Please note that we cannot define NSG for the App Service, only for Subnets and VM's network interfaces. We can only define Access Restrictions and make sure connections to App Service come through either a Service Endpoint or a Private Link. 
+
+### Also note that Application Gateway is best suited for handling external resources and Load Balancer is more cost effective for internal resources. Using Application Gateway for Internal Resources is probably an overkill
+
+## Azure Data Services 
+
 
   
