@@ -566,7 +566,7 @@ Even Azure service bus also uses AMQP protocol.
 - ![alt text](image-21.png)
 - Use Azure Event Grid if you need a lightweight, event-driven solution that reacts to changes in data or state across your services.
 - Use Azure Service Bus if you need reliable messaging with advanced features and complex messaging patterns.
-- Azure Event Grid:
+  ### Azure Event Grid:
 - Purpose: Ideal for event-driven architectures, where you react to changes in data or state across services.
 - Model: Push model, events are sent to event handlers as they are generated.
 - Integration: Deep integration with Azure services and custom applications.
@@ -575,16 +575,16 @@ Even Azure service bus also uses AMQP protocol.
 - Cost: Charges based on operations used, with a free tier for the first 100,000 operations per month.
 - Features: Supports retry policies, dead-lettering, and fan-out patterns.
 - Best For: Scenarios requiring minimal latency and high throughput.
-- Azure Service Bus:
+  ### Azure Service Bus:
 - Purpose: Reliable messaging service for complex messaging patterns and enterprise scenarios.
 - Model: Pull model, where subscribers actively poll topic subscriptions for messages.
 - Integration: Often used for enterprise applications and solutions requiring ordered delivery, transactions, or sessions.
 - Usage: Used for processing raw data messages and command messages.
-Scalability: Supports partitioning and can handle multiple subscribers and publishers.
+### Scalability: Supports partitioning and can handle multiple subscribers and publishers.
 - Cost: Charges based on message operations and additional features like storage.
 - Features: Advanced features like transactions, duplicate detection, message deferral, and scheduled delivery.
 -Best For: Workflows that require robust, feature-rich messaging capabilities.
-Summary:
+### Summary:
 - Event Grid is best for lightweight, serverless, real-time event notification and processing.
 - Service Bus is best for complex, reliable messaging with advanced features and enterprise-level handling.
 ## Healthcare Monitoring
@@ -596,3 +596,266 @@ Summary:
 - Use Azure Stream Analytics to analyze trends and store data in a data lake for long-term analysis.
 - Real-Life Example: A hospital like Mayo Clinic or Johns Hopkins using IoT to monitor patients in real-time.
 - ![alt text](image-24.png)
+
+
+## Event Hubs 
+- Event Hubs is a fully managed, real-time data streaming platform and event ingestion service capable of handling millions of events per second.
+- It's designed for big data scenarios and is commonly used in:
+- Telemetry processing
+- Log aggregation
+- Real-time analytics
+- IoT data ingestion
+- Application event processing
+
+### Main Features
+- High Throughput: Can process millions of events per second
+- Low Latency: Near real-time processing
+- Scalability: Automatically scales with throughput units
+- Partitioning: Events are organized into partitions for parallel processing
+- Consumer Groups: Allows multiple consumers to read the same data independently
+- Time-based Retention: Stores events for a configurable period (1-7 days typically)
+
+### Core Concepts
+- Event Hub Namespace: A management container for multiple Event Hubs
+- ![alt text](image-30.png)
+- Event Hub: The actual entity where events are sent
+- Partitions: Logical divisions of data for parallel processing
+- Publisher: Application sending events
+- Consumer: Application reading events
+- Throughput Units: Measure of capacity (1 TU = 1MB/s ingress, 2MB/s egress)
+- ![alt text](image-26.png)
+- Event Data: The actual message/payload being sent
+- ![alt text](image-27.png)
+- ![alt text](image-28.png)
+- ![alt text](image-29.png)
+- Event Hubs Capture is a built-in feature that automatically saves events to Azure Blob Storage (or Azure Data Lake Storage) in Avro format. 
+- It's the simplest way to store Event Hubs data without writing any code.
+- Capture periodically writes events from all partitions to Blob Storage as Avro files.
+- You configure a time window (e.g., every 5 minutes) and/or a size threshold (e.g., 10 MB) to trigger the capture.
+- The data is organized in a folder structure based on namespace, Event Hub name, partition, and timestamp.
+- Once enabled, events will start appearing in Blob Storage as .avro files.
+- To read the captured data, you'll need an Avro reader. Here's a C# example using the Microsoft.Hadoop.Avro library:
+```c#
+ using Microsoft.Hadoop.Avro;
+using Microsoft.Hadoop.Avro.Container;
+using Azure.Storage.Blobs;
+
+async Task ReadAvroFromBlob()
+{
+    string connectionString = "your-storage-connection-string";
+    string containerName = "eventhubdata";
+    string blobPath = "myehnamespace/myhub/0/2025/02/22/14/30/00.avro";
+
+    var blobClient = new BlobClient(connectionString, containerName, blobPath);
+    using var stream = await blobClient.OpenReadAsync();
+
+    using var reader = AvroContainer.CreateGenericReader(stream);
+    while (reader.MoveNext())
+    {
+        foreach (dynamic record in reader.Current.Objects)
+        {
+            Console.WriteLine($"Event Data: {record.Body}"); // Body is typically binary; adjust based on your schema
+        }
+    }
+}
+
+```
+- Pros: No coding required, automatic, managed by Azure.
+- Cons: Limited to Avro format, less control over transformation, additional cost (~$0.028 per million events captured).
+
+### Architecture
+- [Producers] → [Event Hub] → [Partitions] → [Consumer Groups] → [Consumers]
+- ![alt text](image-25.png)
+
+
+### Code Examples 
+- Add the following package 
+```shell
+dotnet add package Azure.Messaging.EventHubs
+```
+- Code for Producers 
+```c#
+ using Azure.Messaging.EventHubs;
+using Azure.Messaging.EventHubs.Producer;
+using System.Text;
+
+async Task SendEvents()
+{
+    // Connection string from Azure Portal
+    string connectionString = "Endpoint=sb://your-namespace.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=your-key";
+    string eventHubName = "your-eventhub-name";
+
+    // Create a producer client
+    await using var producer = new EventHubProducerClient(connectionString, eventHubName);
+
+    // Create a batch of events
+    using EventDataBatch eventBatch = await producer.CreateBatchAsync();
+
+    // Add events to the batch
+    for (int i = 0; i < 10; i++)
+    {
+        var eventData = new EventData(Encoding.UTF8.GetBytes($"Event #{i}"));
+        eventData.Properties["EventType"] = "TestEvent"; // Optional metadata
+        
+        if (!eventBatch.TryAdd(eventData))
+        {
+            throw new Exception("Event couldn't be added to batch");
+        }
+    }
+
+    // Send the batch
+    await producer.SendAsync(eventBatch);
+    Console.WriteLine("Batch of events sent successfully");
+}
+
+```
+- For Receiving Events add the following code: 
+```shell 
+ dotnet add package Azure.Messaging.EventHubs.Processor
+
+```
+- We use the following code for consumers: 
+```c#
+ using Azure.Messaging.EventHubs;
+using Azure.Messaging.EventHubs.Consumer;
+using Azure.Messaging.EventHubs.Processor;
+using Azure.Storage.Blobs;
+using System.Text;
+
+async Task ReceiveEvents()
+{
+    string connectionString = "Endpoint=sb://your-namespace.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=your-key";
+    string eventHubName = "your-eventhub-name";
+    string consumerGroup = "$Default";
+    string storageConnectionString = "your-storage-connection-string";
+    string blobContainerName = "checkpoints";
+
+    // Storage client for checkpointing
+    var storageClient = new BlobContainerClient(storageConnectionString, blobContainerName);
+
+    // Create processor
+    var processor = new EventProcessorClient(
+        storageClient,
+        consumerGroup,
+        connectionString,
+        eventHubName);
+
+    // Handle received events
+    processor.ProcessEventAsync += async (args) =>
+    {
+        string messageBody = Encoding.UTF8.GetString(args.Data.Body.ToArray());
+        Console.WriteLine($"Received: {messageBody} from partition: {args.Partition.PartitionId}");
+        
+        // Update checkpoint
+        await args.UpdateCheckpointAsync(args.CancellationToken);
+    };
+
+    // Handle errors
+    processor.ProcessErrorAsync += (args) =>
+    {
+        Console.WriteLine($"Error: {args.Exception.Message}");
+        return Task.CompletedTask;
+    };
+
+    // Start processing
+    await processor.StartProcessingAsync();
+
+    // Keep running for some time
+    await Task.Delay(TimeSpan.FromMinutes(5));
+    
+    // Stop processing
+    await processor.StopProcessingAsync();
+}
+
+```
+- Simple Reader using EventHub Consumer Client 
+```c#
+ async Task ReadEventsSimple()
+{
+    string connectionString = "Endpoint=sb://your-namespace.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=your-key";
+    string eventHubName = "your-eventhub-name";
+    string consumerGroup = "$Default";
+
+    await using var consumer = new EventHubConsumerClient(
+        consumerGroup,
+        connectionString,
+        eventHubName);
+
+    // Read events from the beginning
+    await foreach (PartitionEvent partitionEvent in consumer.ReadEventsAsync(false))
+    {
+        string messageBody = Encoding.UTF8.GetString(partitionEvent.Data.Body.ToArray());
+        Console.WriteLine($"Received: {messageBody}");
+    }
+}
+
+```
+
+### Best Practices: 
+- Batching: Send events in batches for better throughput
+- Error Handling: Implement retry logic for transient failures
+- Partitioning: Choose appropriate partition count based on throughput needs
+- Checkpointing: Use checkpoints to track processing progress
+- Resource Management: Properly dispose clients using 'using' statements
+- Monitoring: Use Azure Monitor to track metrics
+
+### Scaling Considerations
+- Scaling Considerations
+- Throughput Units (TUs): 1-20 per namespace (can be increased via support)
+- Partitions: 2-32 per Event Hub (set at creation)
+- Auto-inflate: Automatically increase TUs based on load
+
+### Using MassTransit with EventHub 
+- MassTransit, as of its more recent versions (e.g., v7 and later), provides built-in support for Azure Event Hubs through its "Rider" abstraction.
+```c#
+ using MassTransit;
+using Microsoft.Extensions.DependencyInjection;
+
+public class Program
+{
+    public static async Task Main()
+    {
+        var services = new ServiceCollection();
+
+        services.AddMassTransit(x =>
+        {
+            x.AddRider(rider =>
+            {
+                rider.AddConsumer<EventHubMessageConsumer>();
+
+                rider.UsingEventHub((context, cfg) =>
+                {
+                    cfg.Host("Endpoint=sb://your-namespace.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=your-key");
+                    cfg.Storage("your-storage-connection-string"); // For checkpointing
+                    cfg.ReceiveEndpoint("your-event-hub-name", e =>
+                    {
+                        e.ConfigureConsumer<EventHubMessageConsumer>(context);
+                    });
+                });
+            });
+        });
+
+        var provider = services.BuildServiceProvider();
+        var busControl = provider.GetRequiredService<IBusControl>();
+        await busControl.StartAsync();
+
+        // Producing an event
+        var producerProvider = provider.GetRequiredService<IEventHubProducerProvider>();
+        var producer = await producerProvider.GetProducer("your-event-hub-name");
+        await producer.Produce(new { Message = "Hello, Event Hubs!" });
+
+        await Task.Delay(5000); // Run for a bit
+        await busControl.StopAsync();
+    }
+}
+
+public class EventHubMessageConsumer : IConsumer<object>
+{
+    public Task Consume(ConsumeContext<object> context)
+    {
+        Console.WriteLine($"Received: {context.Message}");
+        return Task.CompletedTask;
+    }
+}
+
+```

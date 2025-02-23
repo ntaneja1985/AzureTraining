@@ -1462,6 +1462,783 @@ The database VNet might only permit traffic from the backend VNet on specific po
 ### Also note that Application Gateway is best suited for handling external resources and Load Balancer is more cost effective for internal resources. Using Application Gateway for Internal Resources is probably an overkill
 
 ## Azure Data Services 
+- Azure provides many data solutions as cloud services like Relational databases, NoSql databases, object stores.
+- Fully managed services.
+- Can be part of Azure app or completely independent. 
+- Various pricing models.
+- Always better than unmanaged solutions(no need to care about patching, hotfixes etc.)
 
 
+### Major Database Features
+- What to look for when selecting a database?
+- Security -->Network Isolation, Encryption.
+- Backup --> Backup Types, Retention Period
+- Availability --> SLA, Replication, DR
+
+### Database on a VM
+- We have the option to install DB on VM 
+- There are ready made VMs in the marketplace. 
+- ![alt text](image-279.png)
+- Pros are: Full Flexibility(configure DB anyway we want) and it provides Full Control
+- Cons are: you have to take care of everything like SLA, Updates, Availability, Security, Backups etc.
+
+### Azure Sql 
+- Managed Sql Server on Azure
+- Works like any other Sql Server
+- Great compatibility with on-prem SQL Server 
+- Offers built in security, backup, availability and more.
+- Flexible pricing models 
+- Comes in many flavors
+- ![alt text](image-280.png)
+
+### Azure Sql Database 
+- Managed Sql Server on Azure 
+- Single database on a single server
+- Automatic backups, updates and scaling. 
+- Good compatibility with on-prem Sql Server but not all features are supported. 
+- For Security it has IP Firewall rules, Service Endpoints, SQL and Azure AD Authentication.
+- Secure Communication using TLS
+- Data is encrypted by default using TDE(Transparent Data Encryption)
+- ![alt text](image-281.png)
+- ![alt text](image-282.png)
+- ![alt text](image-283.png)
+- 2 Compute Tiers 
+- ![alt text](image-286.png)
   
+### Elastic Pool 
+- Based on Azure SQL
+- Allows storing multiple databases on a single server 
+- Great for databases with low average utilization and infrequent spikes
+- ![alt text](image-288.png)
+- Note that in the above pic, no 2 databases are experiencing a spike at the same time.
+- This makes Elastic Pool very cost effective. 
+- Purchase the compute resources we need, not the database.
+
+
+### Managed Instance
+- Closer to the on-prem SQL Server.
+- Near 100% compatible with on-prem SQL 
+- Can be deployed to Vnet
+- Business model close to on-prem one. 
+- Main differences with other flavors:
+- No active geo-replication
+- SLA is 99.99% less than Azure Sql of 99.995%
+- Support built-in functions 
+- Runs CLR code.
+- No autoscaling and tuning. 
+- No availability zone compared to Azure SQL 
+- No serverless tier.
+- No hyperscale( hyperscaling offers superior performance)
+
+## Azure SQL Pricing
+ - ![alt text](image-289.png)
+ - ![alt text](image-290.png)
+ - ![alt text](image-291.png)
+ - ![alt text](image-292.png)
+ - DTU -> Unit of Compute Power created by Microsoft
+ - Roughly 100 DTU is equal to 1 vCore. 
+ - ![alt text](image-293.png)
+ - ![alt text](image-294.png)
+ - ![alt text](image-295.png)
+ - ![alt text](image-296.png)
+ - ![alt text](image-298.png)
+
+## Which Azure SQL to choose ?
+- ![alt text](image-299.png)
+
+## Connecting to Azure SQL Database
+- We need to create an Azure Sql Server instance also 
+- Then we need to allow our private IP Address access to the Sql database 
+- ![alt text](image-300.png)
+- We can copy the connection string from the Azure portal and paste it inside the appsettings.json file.
+- We can then publish our code and copy paste it to catalog VM
+- ![alt text](image-301.png)
+- We will get this error: 
+- ![alt text](image-302.png)
+- For now, we will add the IP Address to the Firewall rules.
+- Now it will start working
+- ![alt text](image-303.png)
+
+## Securing the Database Connection
+- Adding IP Address to the firewall rules to allow access to the database is not the correct way.
+- We dont want firewall rule to allow access through private IP address.
+- We can use private endpoints which are more secure.
+- ![alt text](image-304.png)
+- ![alt text](image-305.png)
+- ![alt text](image-306.png)
+- ![alt text](image-307.png)
+- ![alt text](image-308.png)
+- We need a DNS zone so that this db server name: Server=tcp:nishantreaditserver.database.windows.net,1433 points to the correct IP Address of the private endpoint. 
+- ![alt text](image-309.png)
+- By setting up a private DNS zone, it will redirect that server name to the private IP Address and not the public one
+- ![alt text](image-310.png)
+- Now remove Public Network Access. 
+- Now we can connect to the Azure Sql Database server securely from the catalog VM Vnet using the private endpoint which we just configured. 
+- Now the connection between catalog VM and Azure Sql is fully secure.
+
+### We can also setup the connection string or application settings directly in the App Service also like this: 
+- ![alt text](image-311.png)
+- The way to secure a connection from an App Service to any other serverless Azure resource is through Vnet integration. 
+- We need to have Vnet integration from App Service to Vnet
+- We need to have private endpoint to setup between Vnet and the database. 
+- Go to App Services->Networking 
+- ![alt text](image-312.png)
+- ![alt text](image-313.png)
+- There is already a private endpoint defined for readit-app-vnet and the database.
+
+
+## Cosmos Db
+- Fully managed NoSql database
+- Amazing performance - <10ms for 99% of operations
+- Globally distributed
+- Fully automated management -updates,scaling,fixes etc
+- Exposes multiple APIs: SQL, Mongo, Gremlin, Azure Table, Cassandra(per account)
+- We can choose how to use Cosmos Db, if we are familiar with SQL, we can choose SQL, if we like Mongo, we can choose Mongo 
+- Cosmos Db is a hierarchial database 
+- ![alt text](image-315.png)
+- Can be distributed across many regions
+- API automatically picks the closest one.
+- When using write replication SLA is 99.9999 % (highest SLA in all Azure)
+- Managed automatically, no code changes are required. 
+- Full Backup every 1-24 hours(default is 4)
+- Retention period 20-30 days (default is 30)
+- Supports IP Firewall Rules, Service Endpoints and Private Endpoints
+- Supports Azure AD Authentication
+- Supports Secure communication using TLS 
+- Data is encrypted by default
+
+### Partitions in Cosmos Db 
+- Data items are divided into partitions 
+- Logical group of items based on a specific property
+- For e.g: In a cars database, the Model can be a partition property
+- ![alt text](image-316.png)
+- In the above we are partitioning the data based on the model of the car. 
+- Partitions are the basic scale unit in Cosmos Db.
+- When we do scaling up or scaling down in Cosmos Db, what is actually scaled up/down are the partitions. 
+- Distributions and scale are per partitions
+- Make sure items are divided as evenly as possible. 
+- We want to make sure the number of items in each partition are as similar as possible. 
+- It is very very important to select the right partition property. 
+- This property cannot be modified later. 
+
+## SQL vs NoSQL database 
+- Sql are the traditional relational databases like Sql Server, MySql, Oracle. 
+- Stores data in tables and tables have concrete set of columns 
+- Tables have relationships with each other 
+- ![alt text](image-317.png)
+- SQL databases have transactions: Atomic set of actions 
+- Transactions are ACID. 
+- All relational databases are queried using SQL 
+- NoSql has its emphasis on scale and performance. 
+- NoSql are schemaless. 
+- In NoSql data is stored in JSON format. 
+- Most NoSql databases support Eventual Consistency. 
+- In NoSql database, Data can be temporarily inconsistent. 
+- Transactions are the main bottleneck in SQL databases
+- In NoSql database, we have no standard for querying. 
+- ![alt text](image-318.png)
+
+
+## Cosmos Db consistency levels
+- Traditionally, Relational Dbs have strong consistency: Call returns only after successful commit in all replicas(High availability)
+- In No Sql databases, we have eventual consistency: Call returns immediately, commit in replicas happens later(Low latency)
+- ![alt text](image-319.png)
+- Always have to make a choice. 
+- Cosmos Db offers 5 consistency levels:
+- ![alt text](image-320.png)
+- ![alt text](image-321.png)
+- ![alt text](image-322.png)
+- ![alt text](image-323.png)
+- ![alt text](image-324.png)
+- ![alt text](image-325.png)
+- ![alt text](image-326.png)
+- Consistency levels are configured at the account level.
+- But they can be relaxed at the request level 
+- If the account level consistency is strong, at the request level we can ask for Bounded Staleness request level. 
+
+
+## Cosmos Db pricing
+- Based on RU/s(Request Unit per second)
+- 1 RU = Read item of size 1KB 
+- Read = Get item by its ID, not by query
+- 1 RU/s = Read 1 item of 1 KB in 1 second
+- 400 RU/s = Read 400 items of 1 KB in 1 second 
+- UPDATE/DELETE/INSERT/QUERY - More than 1 RU 
+- We can see the actual RU consumed in the response header of the results. 
+- ![alt text](image-327.png)
+- ![alt text](image-328.png)
+- ![alt text](image-329.png)
+- ![alt text](image-330.png)
+
+## Using Cosmos Db
+- ![alt text](image-332.png)
+- ![alt text](image-333.png)
+- ![alt text](image-334.png)
+- ![alt text](image-335.png)
+- ![alt text](image-336.png)
+- We can do a hierarchial query like this
+- ![alt text](image-337.png)
+- Note we can change all the other field names but cannot change the partition key field. 
+- We can regenerate the keys also 
+- ![alt text](image-338.png)
+- We also have read-only keys as well 
+- The following code saves incoming data to the Cosmos Db 
+```c#
+ [Function("ProcessOrderCosmos")]
+        [CosmosDBOutput(databaseName: "readit-orders", containerName: "orders", Connection = "CosmosDBConnection",CreateIfNotExists =true)]            
+        public object Run(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = null)] HttpRequest req)            
+        {
+            string requestBody = new StreamReader(req.Body).ReadToEndAsync().Result;
+
+            _logger.LogInformation($"Order JSON: {requestBody}");
+
+            //return "OK";
+            var order=JsonSerializer.Deserialize<Order>(requestBody, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })??new Order();
+            order.id=Guid.NewGuid().ToString();
+            return order;
+        }
+
+```
+- For the Function App, if we go to AppSettings, we can see the connection string for Cosmos Db Connection is updated 
+- ![alt text](image-339.png)
+- We can change the consistency level of cosmos db here 
+- ![alt text](image-340.png)
+- If we want to see how many RU/s were consumed by a query, we can find this number in the Query Status tab in the Data Explorer. 
+- ![alt text](image-341.png)
+
+## Azure MySql
+- Managed MySql on Azure
+- Works like any other MySql database
+- Has great compatibility with on-prem databases
+- Offers built-in security, backups, availability and more. 
+- ![alt text](image-342.png)
+- ![alt text](image-343.png)
+- ![alt text](image-344.png)
+- ![alt text](image-345.png)
+- ![alt text](image-347.png)
+- ![alt text](image-348.png)
+- ![alt text](image-349.png)
+- ![alt text](image-350.png)
+- Advantage: Offers a lower cost structure for many workloads compared to Azure SQL Database (especially for smaller-scale or predictable workloads) and Azure Cosmos DB (which can get expensive with high-throughput, globally distributed needs).
+- Benefit: Budget-friendly for small to medium-sized applications, with flexible pricing tiers (Basic, General Purpose, Memory Optimized).
+- Example: For a pharmacy system tracking medication inventory with moderate data volume, Azure MySQL can be cheaper than provisioning Cosmos DB’s Request Units (RUs) or Azure SQL’s vCores.
+- Advantage: Native support for web frameworks and CMS platforms (e.g., WordPress, Drupal) that often rely on MySQL.
+- Azure Database for MySQL is preferred over Azure SQL and Cosmos DB when your pharmacy management system:
+- Uses structured, relational data with moderate scale.
+- Operates in a single region with predictable workloads.
+- Needs a cost-effective, familiar solution with C# integration.
+
+## Azure Postgres SQL
+- Managed PostgresSql on Azure
+- Works like any other PostgresSql database using the same tools
+- Great compatibility with on-prem PostgresSql database
+- Includes Hyperscale deployment
+- Offers built-in security, backups, availability and more. 
+- ![alt text](image-351.png)
+- ![alt text](image-352.png)
+- ![alt text](image-353.png)
+- ![alt text](image-354.png)
+- ![alt text](image-355.png)
+
+## Azure Storage
+- It is an Object Store
+- Used to store special kind of objects like files, documents, video etc. 
+- Massively scalable.
+- Accessible via HTTP or HTTPs
+- Client libraries for every language.
+- Durable and highly available. 
+- 5 types of Storage Types
+- ![alt text](image-356.png)
+- ![alt text](image-357.png)
+- ![alt text](image-358.png)
+- Azure Blobs --> Object Store(Blob --> Binary large object)
+- Great for files, videos, documents, largeTexts etc
+- Upto 4.77TB per file, 190TB in preview for a single file!!!
+- Extremely cost effective 
+- Has great availability options
+- Very easy to use (simple API)
+- Used in conjunction with SQL/NoSQL databases.
+- ![alt text](image-359.png)
+- Structure is as follows: 
+- ![alt text](image-360.png)
+- Containers are logical groups of blobs.
+- Azure Blob storage offers great redundancy options
+- In Azure Zone = datacenter 
+- ![alt text](image-361.png)
+- ![alt text](image-362.png)
+- ![alt text](image-363.png)
+- Failover can be initiated via the Portal, Azure CLI or Powershell. 
+- Blobs are uploaded to one of the three tiers:
+- ![alt text](image-364.png)
+- ![alt text](image-365.png)
+- Retrieval time is the same in Hot and Cool tiers. 
+- Archival tier doesnot support ZRS, GRS and RA-GRS redundancy. 
+- ![alt text](image-366.png)
+- Tier is set at account level, but can be modified per blob
+- Moving between tiers can be automated by lifecycle rules.
+
+## Azure Blob Storage Pricing
+- Pricing is based on 3 factors:
+- ![alt text](image-367.png)
+- ![alt text](image-368.png)
+- ![alt text](image-369.png)
+
+## Using Azure Storage Account
+- ![alt text](image-372.png)
+- ![alt text](image-371.png)
+- ![alt text](image-373.png)
+- ![alt text](image-374.png)
+- ![alt text](image-375.png)
+- ![alt text](image-376.png)
+- We have 2 keys to rotate keys so as to regenerate the keys.
+
+### Using Azure Blob Storage .NET Client Library
+- The Azure.Storage.Blobs library is part of the Azure SDK for .NET, designed to interact with Azure Blob Storage. It allows you to upload, download, delete, and manage blobs (files) in a scalable, managed storage service. Key features include:
+- Support for block blobs, append blobs, and page blobs.
+- Asynchronous operations for efficient I/O.
+- Integration with .NET Core and .NET Framework.
+- Install the following nuget package: 
+```shell
+dotnet add package Azure.Storage.Blobs
+```
+### Basic Concepts:
+- BlobServiceClient: Entry point to interact with the storage account.
+- BlobContainerClient: Manages a specific container (e.g., pharmacy-events).
+- BlobClient: Handles individual blobs (e.g., a JSON file like events-20250222.json).
+
+### Connect to Blob Storage
+```c#
+ using Azure.Storage.Blobs;
+
+string connectionString = "DefaultEndpointsProtocol=https;AccountName=pharmacy-storage;AccountKey=your-key;EndpointSuffix=core.windows.net";
+BlobServiceClient blobServiceClient = new BlobServiceClient(connectionString);
+
+```
+### Create a Container
+- Containers organize blobs, like folders. Create one for pharmacy events
+```c#
+ async Task CreateContainerAsync()
+{
+    string containerName = "pharmacy-events";
+    BlobContainerClient containerClient = blobServiceClient.GetBlobContainerClient(containerName);
+    
+    await containerClient.CreateIfNotExistsAsync();
+    Console.WriteLine($"Container '{containerName}' created or already exists.");
+}
+```
+### Upload a Blob(e.g Event Hubs Data)
+- Store a JSON file with medication events
+```c#
+  async Task UploadBlobAsync()
+{
+    string containerName = "pharmacy-events";
+    string blobName = "events-20250222.json";
+    BlobContainerClient containerClient = blobServiceClient.GetBlobContainerClient(containerName);
+    BlobClient blobClient = containerClient.GetBlobClient(blobName);
+
+    string jsonData = @"[
+        {""Timestamp"":""2025-02-22T10:00:00Z"",""Medication"":""Aspirin"",""Quantity"":50,""EventType"":""Dispensed""},
+        {""Timestamp"":""2025-02-22T12:00:00Z"",""Medication"":""Ibuprofen"",""Quantity"":100,""EventType"":""Received""}
+    ]";
+
+    using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(jsonData));
+    await blobClient.UploadAsync(stream, overwrite: true);
+    Console.WriteLine($"Uploaded '{blobName}' to '{containerName}'.");
+}
+
+```
+### Download a Blob
+- Retrieve the JSON file for processing (e.g., LLM training or analytics)
+```c#
+ async Task DownloadBlobAsync()
+{
+    string containerName = "pharmacy-events";
+    string blobName = "events-20250222.json";
+    BlobContainerClient containerClient = blobServiceClient.GetBlobContainerClient(containerName);
+    BlobClient blobClient = containerClient.GetBlobClient(blobName);
+
+    BlobDownloadResult download = await blobClient.DownloadContentAsync();
+    string jsonContent = download.Content.ToString();
+    Console.WriteLine($"Downloaded content: {jsonContent}");
+}
+```
+
+### List Blobs in a container
+- List all event files for batch processing 
+```c#
+ async Task ListBlobsAsync()
+{
+    string containerName = "pharmacy-events";
+    BlobContainerClient containerClient = blobServiceClient.GetBlobContainerClient(containerName);
+
+    await foreach (BlobItem blobItem in containerClient.GetBlobsAsync())
+    {
+        Console.WriteLine($"Blob: {blobItem.Name}, Size: {blobItem.Properties.ContentLength} bytes");
+    }
+}
+```
+
+### Delete a Blob
+- Clean up old event data
+```c#
+ async Task DeleteBlobAsync()
+{
+    string containerName = "pharmacy-events";
+    string blobName = "events-20250222.json";
+    BlobContainerClient containerClient = blobServiceClient.GetBlobContainerClient(containerName);
+    BlobClient blobClient = containerClient.GetBlobClient(blobName);
+
+    await blobClient.DeleteIfExistsAsync();
+    Console.WriteLine($"Deleted '{blobName}' from '{containerName}'.");
+}
+
+```
+
+### Append to a Blob(e.g Logging Events)
+- Use an append blob for continuous event logging
+```c#
+ async Task AppendToBlobAsync()
+{
+    string containerName = "pharmacy-events";
+    string blobName = "event-log.txt";
+    BlobContainerClient containerClient = blobServiceClient.GetBlobContainerClient(containerName);
+    AppendBlobClient appendBlobClient = containerClient.GetAppendBlobClient(blobName);
+
+    await appendBlobClient.CreateIfNotExistsAsync();
+    string eventData = "2025-02-22T14:00:00Z: Dispensed Aspirin 50\n";
+    using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(eventData));
+    await appendBlobClient.AppendBlockAsync(stream);
+    Console.WriteLine($"Appended data to '{blobName}'.");
+}
+
+```
+
+### Authentication: Use Azure AD or SAS tokens instead of connection strings for production security:
+```c#
+ BlobServiceClient client = new BlobServiceClient(new Uri("https://pharmacy-storage.blob.core.windows.net"), new DefaultAzureCredential());
+```
+
+### Using Shared Access Signatures(SAS Tokens)
+- A shared access signature (SAS) is a URI that grants restricted access rights to Azure Storage resources. You can provide a shared access signature to clients who should not be trusted with your storage account key but whom you wish to delegate access to certain storage account resources. By distributing a shared access signature URI to these clients, you grant them access to a resource for a specified period of time
+- ![alt text](image-377.png)
+- To provide only read-only access to a particular blob use this 
+- ![alt text](image-378.png)
+- We can attach the SAS Token to the URL here:
+- Example of SAS token
+```shell
+ https://<storage-account-name>.blob.core.windows.net/<container-name>/<blob-name>?sv=2021-04-10&ss=b&srt=sco&sp=rwdlacx&se=2025-12-31T23:59:59Z&st=2025-01-01T00:00:00Z&spr=https&sig=<signature>
+
+ https://nishant1storage.blob.core.windows.net/storeimages/Screenshot%202025-02-23%20114625.png?sv=2022-11-02&ss=b&srt=o&sp=r&se=2025-02-24T01:02:52Z&st=2025-02-23T17:02:52Z&spr=https&sig=3AKgxAAat6xjlkRLdx9jJkdoekSSXue0lOjWKqG6H8k%3D
+ 
+```
+- sv: Storage service version.
+- ss: Services (Blob, Queue, Table, File).
+- srt: Resource types (Service, Container, Object).
+- sp: Permissions (Read, Write, Delete, etc.).
+- se: Expiry time.
+- st: Start time.
+- spr: Protocol (HTTPS).
+- sig: Signature.
+
+### Types of SAS Tokens
+- Account SAS:
+Grants access to multiple resources (e.g., blobs, containers, queues) across the storage account.
+Example: Read/write to any blob in any container.
+- Service SAS:
+Grants access to a specific resource (e.g., a single blob or container).
+Example: Read-only access to events-20250222.json.
+- User Delegation SAS:
+Uses Azure AD credentials (instead of the account key) to sign the token, offering enhanced security via RBAC (Role-Based Access Control).
+Example: A pharmacy staff member’s AD identity grants temporary blob access.
+
+### Programmatically creating a SAS token for a specific blob
+```c#
+ using Azure.Storage.Blobs;
+using Azure.Storage.Sas;
+using System;
+
+class SasTokenExample
+{
+    static void Main()
+    {
+        string connectionString = "DefaultEndpointsProtocol=https;AccountName=pharmacy-storage;AccountKey=your-key;EndpointSuffix=core.windows.net";
+        string containerName = "pharmacy-events";
+        string blobName = "events-20250222.json";
+
+        // Create BlobClient
+        BlobClient blobClient = new BlobClient(connectionString, containerName, blobName);
+
+        // Define SAS permissions and expiry
+        BlobSasBuilder sasBuilder = new BlobSasBuilder
+        {
+            BlobContainerName = containerName,
+            BlobName = blobName,
+            Resource = "b", // Blob
+            StartsOn = DateTimeOffset.UtcNow.AddHours(-1), // Start 1 hour ago
+            ExpiresOn = DateTimeOffset.UtcNow.AddHours(24), // Expire in 24 hours
+            Protocol = SasProtocol.Https,
+        };
+        sasBuilder.SetPermissions(BlobSasPermissions.Read); // Read-only
+
+        // Generate SAS token
+        string sasToken = sasBuilder.ToSasQueryParameters(new StorageSharedKeyCredential("pharmacy-storage", "your-key")).ToString();
+        Uri sasUri = new Uri(blobClient.Uri + "?" + sasToken);
+
+        Console.WriteLine($"SAS URI: {sasUri}");
+    }
+}
+
+```
+- Stored Access Policies: Link SAS to a policy on the container for revocability
+```c#
+ sasBuilder.Identifier = "policy-name"; // Defined in Azure Portal
+```
+- Secure Storage: Don’t hardcode account keys or SAS tokens in source code; use Azure Key Vault.
+
+## Networking and Fail Over of Storage Account
+- ![alt text](image-379.png)
+- ![alt text](image-380.png)
+- We also have private endpoint connections
+- We can setup private endpoint to storage account also. This means in a particular Vnet, this storage account will have a private IP and resources or VMs in that Vnet can access this storage account through that IP. 
+- ![alt text](image-381.png)
+- Azure Storage redundancy copies your data so that it is protected from transient hardware failures, network or power outages, and natural disasters.
+- ![alt text](image-382.png)
+
+## CDN and Automation
+- CDN is a content delivery network and it brings content of the storage account closer to the user.
+- There are quite a few CDN locations around the world. 
+- When we connect CDN to storage account, then objects in the storage account are replicated to the CDN locations and when we retrieve the object, it is downloaded from the closest CDN. 
+- ![alt text](image-383.png)
+- After the CDN is configured and its link is generated we can modify the URL 
+- ![alt text](image-387.png)
+- Now image retrieval is much faster due to CDN
+### Lifecycle management 
+- Offers a rich, rule-based policy for general purpose v2 and blob storage accounts. Use the policy to transition your data to the appropriate access tiers or expire at the end of the data's lifecycle. A new or updated policy may take up to 48 hours to complete.
+- Helps to save on costs and improve performance. 
+- ![alt text](image-384.png)
+- ![alt text](image-385.png)
+- We can see this in the code view also 
+- ![alt text](image-386.png)
+```json 
+ { "rules": 
+[ { "enabled": true, "name": "rulefoo", "type": "Lifecycle", 
+"definition": 
+{ "actions": 
+{ "version": 
+{ "delete": { "daysAfterCreationGreaterThan": 90 } },
+  "baseBlob": 
+  { "tierToCool": { "daysAfterModificationGreaterThan": 30 }, 
+    "tierToArchive": { "daysAfterModificationGreaterThan": 90 }, 
+    "delete": { "daysAfterModificationGreaterThan": 2555 } 
+  } },
+"filters": { "blobTypes": [ "blockBlob" ], "prefixMatch": [ "container1/foo" ] } } } ] }
+```
+- The above rule moves the blob to the cool tier after 30 days, to archive tier after 90 days and then deletes the blob after 2555 days
+- ![alt text](image-388.png)
+- We can also use Azure Storage explorer which is a desktop app to access the Azure Storage Account
+
+
+## Azure Redis
+- Managed Redis on Azure
+- Provides very fast in-memory distributed cache.
+- Great for short-lived frequently accessed data i.e Shopping Cart, Stock Quotes
+- Fully compatible with OSS Redis(community edition) and Enterprise Edition - depends on service tiers
+- ![alt text](image-389.png)
+- ![alt text](image-390.png)
+- Most clients go for Standard or Premium.
+- Azure price is based on Tier we select and Memory consumed
+- ![alt text](image-391.png)
+
+## Using Azure Redis
+- We will store shopping cart items in Redis
+- ![alt text](image-392.png)
+- It’s highly scalable, secure, and supports a wide range of use cases beyond caching, such as session stores, message queues, and real-time analytics
+- In-Memory: Data is stored in RAM, offering sub-millisecond latency.
+- Managed: Azure handles provisioning, scaling, updates, and backups.
+- Open-Source Compatible: Supports Redis data structures (e.g., strings, hashes, lists, sets) and commands.
+- Offers throughput up to millions of requests per second with latencies under 1 ms.
+- Ideal for speeding up data access in your pharmacy system (e.g., retrieving medication inventory).
+- Vertical Scaling: Increase compute/memory within a tier (e.g., from 1 GB to 53 GB in Standard).
+- Horizontal Scaling: Premium and Enterprise tiers support clustering (sharding) for larger workloads (up to 1.2 TB in Premium).
+- Geo-Replication: Enterprise tiers allow active-active replication across regions.
+- Premium and Enterprise tiers support persisting cache data to Azure Storage (RDB or AOF formats), protecting against data loss.
+- Use Cases
+- Caching:
+Store frequently accessed data (e.g., medication stock levels) to reduce database load.
+- Session Store:
+Manage pharmacy staff session data for a web portal.
+- Message Queuing:
+Use Redis lists to queue tasks (e.g., processing medication orders).
+- Real-Time Analytics:
+Track dispensing trends with RedisTimeSeries (e.g., hourly Aspirin usage).
+- Pharmacy Predictions:
+Cache Event Hubs data or intermediate results for your LLM/inventory forecasting.
+- Using it with c#
+- Install the nuget package: 
+```shell
+ Install-Package StackExchange.Redis
+```
+- Go to "Create a resource" > "Azure Cache for Redis."
+- Choose a tier (e.g., Standard C1), region, and name (e.g., pharmacy-cache).
+- Get the hostname (e.g., pharmacy-cache.redis.cache.windows.net) and access key from "Access keys."
+```c#
+ using StackExchange.Redis;
+using System;
+
+class RedisExample
+{
+    private static Lazy<ConnectionMultiplexer> lazyConnection = new Lazy<ConnectionMultiplexer>(() =>
+    {
+        string connectionString = "pharmacy-cache.redis.cache.windows.net:6380,password=your-access-key,ssl=true,abortConnect=false";
+        return ConnectionMultiplexer.Connect(connectionString);
+    });
+
+    static IDatabase Cache => lazyConnection.Value.GetDatabase();
+
+    static async Task Main()
+    {
+        try
+        {
+            // Set inventory data
+            await Cache.StringSetAsync("inventory:Aspirin", "950");
+            await Cache.StringSetAsync("inventory:Ibuprofen", "1100");
+
+            // Get inventory data
+            string aspirinStock = await Cache.StringGetAsync("inventory:Aspirin");
+            Console.WriteLine($"Aspirin Stock: {aspirinStock}");
+
+            // Increment dispensed quantity
+            await Cache.StringIncrementAsync("dispensed:Aspirin", 50);
+            string dispensed = await Cache.StringGetAsync("dispensed:Aspirin");
+            Console.WriteLine($"Aspirin Dispensed: {dispensed}");
+
+            // Set with expiry (e.g., 1 hour)
+            await Cache.StringSetAsync("temp:report", "Daily Report", TimeSpan.FromHours(1));
+        }
+        catch (RedisConnectionException ex)
+        {
+            Console.WriteLine($"Connection failed: {ex.Message}");
+        }
+    }
+}
+```
+- ConnectionMultiplexer: Manages the connection to Redis, reusable across your app.
+- StringSetAsync: Stores key-value pairs (e.g., inventory levels).
+- StringIncrementAsync: Tracks dispensed quantities atomically.
+- Expiry: Temporary data (e.g., reports) auto-deletes after a set time.
+- ![alt text](image-393.png)
+- Eviction Policy in Redis
+- ![alt text](image-394.png)
+```c#
+//Using Redis
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using catalog.Data;
+using catalog.Models;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using ServiceStack.Redis;
+
+namespace catalog.Pages
+{
+    public class IndexModel : PageModel
+    {
+        private readonly ILogger<IndexModel> _logger;
+        private readonly BookContext _context;
+        private readonly IConfiguration _config;
+
+        public IndexModel(ILogger<IndexModel> logger, IConfiguration config, BookContext context)
+        {
+            _logger = logger;
+            _context = context;
+            _config = config;
+        }
+
+        public void OnGet()
+        {
+            var books=new List<Book>();
+
+            try  {
+                books = _context.Books.ToList();
+            }
+            catch (Exception ex)  {
+                ViewData["Error"]=ex.Message;
+                ViewData["books"] = books;
+                return;
+            }
+            
+            //UNCOMMENT AFTER ADDING REDIS
+            //Get data about the shopping cart
+            var client = GetRedisClient();
+            var cartItems = client.GetListCount("cart");
+            ViewData["cartNo"] = cartItems;
+
+            ViewData["books"] = books;
+            
+        }
+
+        public IActionResult OnPostAddToShoppingCart()
+        {
+            // UNCOMMECT AFTER ADDING REDIS
+            var client = GetRedisClient();
+            var bookId = int.Parse(Request.Form["bookId"]);
+                
+            if (!client.GetAllItemsFromList("cart").Contains(bookId.ToString()))
+            {
+                var book = _context.Books.Find(bookId);
+                book.InStock--;
+                _context.SaveChanges();
+            
+                client.AddItemToList("cart", bookId.ToString());
+            }
+
+            return RedirectToPage();
+        }
+
+        public IActionResult OnPostLoad()
+        {
+            BookLoader.LoadBooks(_context);
+            return RedirectToPage();
+        }
+
+        private IRedisClient GetRedisClient()
+        {
+            var conString = _config.GetValue<String>("Redis:ConnectionString");
+            var manager = new RedisManagerPool(conString);
+            return manager.GetClient();
+        }
+    }
+}
+
+
+```
+- When we want to connect from AKS to Azure Sql, we need to create a private endpoint for Azure SQL. 
+- ![alt text](image-395.png)
+- ![alt text](image-396.png)
+- When we create AKS cluster, a Vnet is automatically created
+- We need to create a private endpoint between the AKS vnet and the Azure Sql
+- To call an Azure Function Url use this code:
+```c#
+ try  {
+            var client=new HttpClient();
+            var result=client.PostAsync(_config.GetValue<String>("OrderFunctionUrl"),new StringContent(json)).Result;
+                     
+            Console.WriteLine("Order sent, status:" + result);
+
+            if (result.StatusCode==System.Net.HttpStatusCode.NoContent)  {
+                ClearCart();
+            }
+ }
+
+```
+- ![alt text](image-397.png)
+- ![alt text](image-398.png)
+
+
+## Selecting the right Data Store
+- ![alt text](image-399.png)
