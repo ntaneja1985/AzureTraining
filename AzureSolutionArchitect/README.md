@@ -2242,3 +2242,518 @@ namespace catalog.Pages
 
 ## Selecting the right Data Store
 - ![alt text](image-399.png)
+
+## Messaging in Azure 
+- Messaging services must be able to handle load, throughput and have great latency 
+- They are a core part of every Microservices architecture.
+- Azure has 4 fully managed messaging services:
+- ![alt text](image-400.png)
+
+## Storage Queue
+- Part of Azure Storage Account 
+- Simplest Queue implementation 
+- Create Queue -> Send Message -> Receive Message 
+- No special pricing for Queue, included in Storage Account
+- Same availability as Storage Account 
+- ![alt text](image-401.png)
+- ![alt text](image-402.png)
+- ![alt text](image-403.png)
+- ![alt text](image-404.png)
+- ![alt text](image-405.png)
+
+### Using Storage Queues in .NET 
+- Add the following nuget package:
+```shell 
+ dotnet add package Azure.Storage.Queues
+```
+- We can use it as follows:
+```c#
+ using Azure.Storage.Queues;
+using Azure.Storage.Queues.Models;
+using System;
+using System.Threading.Tasks;
+
+class Program
+{
+    // Replace with your actual connection string from Azure Portal
+    private static string connectionString = "DefaultEndpointsProtocol=https;AccountName=youraccount;AccountKey=yourkey;EndpointSuffix=core.windows.net";
+    private static string queueName = "myqueue";
+
+    static async Task Main(string[] args)
+    {
+        await RunQueueDemo();
+    }
+
+    static async Task RunQueueDemo()
+    {
+        try
+        {
+            // Create a queue client
+            QueueClient queueClient = new QueueClient(connectionString, queueName);
+
+            // Create the queue if it doesn't exist
+            await queueClient.CreateIfNotExistsAsync();
+
+            // Send a message
+            string message = "Hello, Azure Queue!";
+            await queueClient.SendMessageAsync(message);
+            Console.WriteLine($"Sent message: {message}");
+
+            // Peek at the message (view without removing)
+            PeekedMessage[] peekedMessages = await queueClient.PeekMessagesAsync(maxMessages: 1);
+            if (peekedMessages.Length > 0)
+            {
+                Console.WriteLine($"Peeked message: {peekedMessages[0].MessageText}");
+            }
+
+            // Receive and process message
+            QueueMessage[] messages = await queueClient.ReceiveMessagesAsync(maxMessages: 1);
+            if (messages.Length > 0)
+            {
+                QueueMessage receivedMessage = messages[0];
+                Console.WriteLine($"Received message: {receivedMessage.MessageText}");
+
+                // Process the message here...
+
+                // Delete the message after processing
+                await queueClient.DeleteMessageAsync(receivedMessage.MessageId, receivedMessage.PopReceipt);
+                Console.WriteLine("Message processed and deleted");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+    }
+}
+
+```
+### Key points about using Azure Storage Queues:
+
+- Connection: Get your connection string from the Azure Portal under your Storage Account's "Access keys" section.
+- QueueClient: This is your main interface for queue operations. You can:
+- Create queues with CreateIfNotExistsAsync()
+- Send messages with SendMessageAsync()
+- Peek messages with PeekMessagesAsync()
+- Receive messages with ReceiveMessagesAsync()
+- Delete messages with DeleteMessageAsync()
+- Message Handling:
+- Messages can be up to 64KB in size
+- Default visibility timeout is 30 seconds (message becomes invisible to other consumers)
+- You can set custom visibility timeouts when receiving messages
+- Here is an example with more options:
+```c#
+ // Sending a message with delay
+await queueClient.SendMessageAsync(
+    message: "Delayed message",
+    visibilityTimeout: TimeSpan.FromSeconds(30),  // Hidden for 30 seconds initially
+    timeToLive: TimeSpan.FromHours(1)  // Message expires after 1 hour
+);
+
+// Receiving with custom visibility timeout
+QueueMessage[] messages = await queueClient.ReceiveMessagesAsync(
+    maxMessages: 1,
+    visibilityTimeout: TimeSpan.FromMinutes(5)  // Give 5 minutes to process
+);
+
+```
+### Best practices:
+
+- Always handle exceptions as Azure operations might fail due to network issues
+- Implement retry logic for transient failures
+- Consider poison queue patterns for messages that repeatedly fail processing
+- Use message IDs or custom metadata for tracking
+- Monitor queue length to manage workload
+
+- For production scenarios we need to do this 
+```c#
+ public class QueueProcessor
+{
+    private readonly QueueClient _queueClient;
+    private const int MaxRetries = 3;
+
+    public QueueProcessor(string connectionString, string queueName)
+    {
+        _queueClient = new QueueClient(connectionString, queueName);
+    }
+
+    public async Task ProcessMessagesAsync()
+    {
+        while (true)
+        {
+            try
+            {
+                QueueMessage[] messages = await _queueClient.ReceiveMessagesAsync(maxMessages: 32);
+                
+                foreach (QueueMessage message in messages)
+                {
+                    int retries = 0;
+                    bool processed = false;
+
+                    while (!processed && retries < MaxRetries)
+                    {
+                        try
+                        {
+                            // Process your message here
+                            Console.WriteLine($"Processing: {message.MessageText}");
+                            processed = true;
+                        }
+                        catch (Exception)
+                        {
+                            retries++;
+                            if (retries == MaxRetries)
+                            {
+                                // Move to poison queue or handle failure
+                            }
+                            await Task.Delay(1000 * retries); // Exponential backoff
+                        }
+                    }
+
+                    await _queueClient.DeleteMessageAsync(message.MessageId, message.PopReceipt);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Queue error: {ex.Message}");
+                await Task.Delay(5000); // Wait before retrying
+            }
+        }
+    }
+}
+
+```
+- Compared to alternatives like Azure Service Bus (which is more feature-rich but pricier), Storage Queues are dirt cheap and simple:
+- You pay per operation and storage used, with no fancy subscriptions.
+- Great for straightforward messaging needs without the overhead of complex routing or pub/sub systems.
+- Storage Queues aren’t perfect for everything:
+- If you need real-time messaging (like chat apps), WebSockets or SignalR are better.
+- If you need complex routing or topics/subscriptions, Azure Service Bus or Event Grid might suit you more.
+- For massive data streams, consider Event Hubs or Kafka.
+
+## Event Grid 
+- Allow building event-based architecture
+- Publishes events to interested parties 
+- No queue/no order 
+- Strong integration with many Azure Services 
+- Very cost effective and has the simplest pricing scheme in Azure
+- No tiers, High Availability is built in 
+- ![alt text](image-406.png)
+- ![alt text](image-407.png)
+- ![alt text](image-408.png)
+- ![alt text](image-409.png)
+- Supports upto 10 million events per second 
+- ![alt text](image-410.png)
+- Strong emphasis on performance 
+- ![alt text](image-411.png)  
+- ![alt text](image-412.png)
+- ![alt text](image-413.png)
+- In an Azure Function App, if it is not an HTTP trigger, rather a Blob trigger or Event Grid Trigger, 
+  we need to specify a storage account to store its metadata. 
+- We can specify this in local.settings.json file like this 
+```json 
+{
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+    "AzureWebJobsStorage": "DefaultEndpointsProtocol=https;AccountName=nishstorage98;AccountKey=kUcf42dWVwUV51xadO9ZYJyMp7Z5MumbhxH/tXDzjG4cGNxwXsQ36GEhSbWWuaXSRTmjWQSTy/5o+AStNdNusw==;EndpointSuffix=core.windows.net",
+    "CosmosDBConnection": "AccountEndpoint=https://readit-cosmos-nishant.documents.azure.com:443/;AccountKey=2TpF59rE6IBC5l7XxaLvMbHqrb9KbOoz2hXKXW9OroPrsKzIIsTfWK725XjVvfvRTHGu8exkohv0ACDb7ey4mQ==;",
+    "StorageConnectionString": "DefaultEndpointsProtocol=https;AccountName=nishantordersreadit;AccountKey=/BZQpJOdZJPTG2GxLpi6oBpCM9gYt8RgJnny0ZiAF5IKQaXDlMyImmHB2KbPEEiiHilYBu9iKH1k+AStj1gygw==;EndpointSuffix=core.windows.net"
+  }
+}
+
+
+```
+- Here is the code for function app which will process the event grid events 
+```c#
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
+using System.Text.Json;
+using System.Collections.Generic;
+using Microsoft.Azure.Functions.Worker;
+using Azure.Messaging.EventGrid;
+using Azure.Storage.Blobs;
+using Azure.Messaging.EventGrid.SystemEvents;
+
+namespace AzureCourse.Function
+{    
+    public class CosmosOrderFunction
+    {
+        private readonly ILogger<CosmosOrderFunction> _logger;
+
+        public CosmosOrderFunction(ILogger<CosmosOrderFunction> logger)
+        {
+            _logger = logger;
+        }
+
+        // [Function("ProcessOrderCosmos")]
+        // [CosmosDBOutput(databaseName: "readit-orders", containerName: "orders", Connection = "CosmosDBConnection",CreateIfNotExists =true)]            
+        // public object Run(
+        //     [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = null)] HttpRequest req)            
+        // {
+        //     string requestBody = new StreamReader(req.Body).ReadToEndAsync().Result;
+
+        //     _logger.LogInformation($"Order JSON: {requestBody}");
+
+        //     //return "OK";
+        //     var order=JsonSerializer.Deserialize<Order>(requestBody, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })??new Order();
+        //     order.id=Guid.NewGuid().ToString();
+        //     return order;
+        // }
+
+          [Function("ProcessOrderCosmos")]
+        [CosmosDBOutput(databaseName: "readit-orders", containerName: "orders", Connection = "CosmosDBConnection",CreateIfNotExists =true)]
+        public object Run(
+            [EventGridTrigger] EventGridEvent eventGridEvent,
+            [BlobInput("neworders", Connection = "StorageConnectionString")] BlobContainerClient container)
+        {           
+
+            try
+            {
+                _logger.LogInformation("Function started");
+                _logger.LogInformation($"Event details: Topic: {eventGridEvent.Topic}");
+                _logger.LogInformation($"Event data: {eventGridEvent.Data.ToString()}");
+
+                string eventBody = eventGridEvent.Data.ToString();
+
+                _logger.LogInformation("Deserializing to StorageBlobCreatedEventData...");
+                var storageData = JsonSerializer.Deserialize<StorageBlobCreatedEventData>(eventBody, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+                _logger.LogInformation("Done");
+
+                _logger.LogInformation("Get the name of the new blob...");
+                var blobName = Path.GetFileName(storageData.Url);
+                _logger.LogInformation($"Name of file: {blobName}");
+
+                _logger.LogInformation("Get blob from storage...");
+                var blockBlob = container.GetBlobClient(blobName);
+                var orderText = blockBlob.DownloadContent().Value.Content.ToString();
+                _logger.LogInformation("Done");
+                _logger.LogInformation($"Order text: {orderText}");
+
+                var order=JsonSerializer.Deserialize<Order>(orderText, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })??new Order();
+                order.id=Guid.NewGuid().ToString();
+                return order;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in function");
+                return null;
+            }
+        }
+    }
+}
+
+
+
+```
+- For the event grid to trigger the function app when a blob is uploaded, we need to specify an Event Grid Subscription like this 
+- ![alt text](image-415.png)
+- ![alt text](image-416.png)
+- ![alt text](image-417.png)
+- Upload the Blob file: orderSample.json 
+- ![alt text](image-418.png)
+- Process the function app which runs as a result of Event Grid Trigger 
+- ![alt text](image-419.png)
+- Check Cosmos Db 
+- ![alt text](image-420.png)
+- To upload a blob manually from the shopping cart use this code: 
+- This code will upload the blob to the neworders container where the Event Grid will be triggered, which will call the ProcessOrderCosmos function, which will deserialize the order from the blob and add it to Cosmos Db 
+```c#
+ public void OnPostPlaceOrder()  {
+            
+            var booksInCart=GetBooksInShoppingCart();
+            var order=new Order();
+            double total=0;
+            order.orderDate=DateTime.Now;
+            order.priority=1;
+            order.items=new List<OrderItem>();
+
+            foreach (var book in booksInCart)  {
+                var item=new OrderItem();
+                item.name=book.Name;
+                item.id=book.ID;
+                item.price=book.Price;
+                total+=item.price;
+                order.items.Add(item);
+            }
+
+            order.total=total;
+
+            var json=JsonConvert.SerializeObject(order);
+
+            Console.WriteLine(json);
+
+            // try  {
+            // var client=new HttpClient();
+            // var result=client.PostAsync(_config.GetValue<String>("OrderFunctionUrl"),new StringContent(json)).Result;
+                     
+            // Console.WriteLine("Order sent, status:" + result);
+
+            // if (result.StatusCode==System.Net.HttpStatusCode.NoContent)  {
+            //     ClearCart();
+            // }
+
+            // ViewData["books"]=new List<Book>();
+            // ViewData["OrderStatus"]="sent";
+            // }
+            // catch (Exception ex)  {
+            //     ViewData["OrderStatus"]="Error sending order: " + ex.Message;
+            // }
+
+            try  {
+                string storageConnection = _config.GetValue<String>("StorageConnectionString"); 
+                var blobService=new BlobServiceClient(storageConnection);
+                var container=blobService.GetBlobContainerClient("neworders");
+                var blobClient=container.GetBlobClient($"order_{Guid.NewGuid().ToString()}.json");
+                
+                // Prepare stream for upload
+                byte[] byteArray=Encoding.ASCII.GetBytes(json);
+                MemoryStream stream=new MemoryStream(byteArray);
+                
+                var resp=blobClient.Upload(stream); 
+
+                Console.WriteLine("Order sent!");
+
+                ClearCart();                
+
+                ViewData["books"]=new List<Book>();
+                ViewData["OrderStatus"]="sent";
+            }
+            catch (Exception ex)  {
+                ViewData["OrderStatus"]="Error sending order: " + ex.Message;
+            }
+
+
+        }     
+
+```
+- ![alt text](image-421.png)
+- ![alt text](image-422.png)
+- ![alt text](image-423.png)
+
+
+## Protecting the Orders Function 
+- ![alt text](image-424.png)
+- ![alt text](image-425.png)
+- Basically we add a rule inside Access Restrictions to allow traffic only from the Event Grid Service Tag 
+
+
+## Azure Service Bus 
+- Fully managed, full blown message queuing service 
+- Durable 
+- Support point to point messaging(Queue) and pub/sub(Topic) scenarios 
+- Combination of Storage queues and Event Grid Topics 
+- Compatible with AMQP protocol and JMS 2.0 API (Premium only). Used with Java based systems. 
+- ![alt text](image-426.png)
+- ![alt text](image-427.png)
+- offers advanced features 
+- Message Sessions(guarantees FIFO)
+- Dead letter queue 
+- Scheduled delivery 
+- Transactions 
+- Duplicate Detection 
+- Offers SLA of 99.9% 
+- Can be configured for geo-disaster recovery. 
+- ![alt text](image-428.png)
+- 3 tiers: Basic, Standard, Premium
+- ![alt text](image-429.png)
+- ![alt text](image-430.png)
+- ![alt text](image-431.png)
+- ![alt text](image-432.png)
+
+## Using Service Bus 
+- Private Endpoints are available only in the Premium Tier. 
+- ![alt text](image-433.png)
+- ![alt text](image-434.png)
+- Code to send the message to the queue:
+```c#
+  public static string connectionString = "Endpoint=sb://sbdemonishant.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=zQGYImgPo535J75IPEW8q/D46un9zhaVn+ASbAypukY=";
+        public static string queueName = "my-items";
+
+        public static async Task Main(string[] args)
+        {    
+            
+            Console.WriteLine("======================================================");
+            Console.WriteLine("Press ENTER key to exit after sending all the messages.");
+            Console.WriteLine("======================================================");
+
+            // Send message
+            await SendMessageAsync();
+
+            Console.Read();
+        }
+
+        static async Task SendMessageAsync()
+        {
+            // create a Service Bus client 
+            await using (ServiceBusClient client = new ServiceBusClient(connectionString))
+            {
+                // create a sender for the queue 
+                ServiceBusSender sender = client.CreateSender(queueName);
+
+                // create a message that we can send
+                ServiceBusMessage message = new ServiceBusMessage("Test Message");
+
+                // send the message
+                await sender.SendMessageAsync(message);
+                Console.WriteLine($"Sent a single message to the queue: {queueName}");
+            }
+        }          
+    }
+```
+
+## Event Hubs 
+- Big data streaming platform and event ingestion service 
+- No messaging in the description 
+- Basically it is a managed Kafka implementation 
+- Can receive millions of events per second 
+- ![alt text](image-435.png)
+- ![alt text](image-436.png)
+- ![alt text](image-437.png)
+- ![alt text](image-438.png)
+- ![alt text](image-440.png)
+- ![alt text](image-441.png)
+- ![alt text](image-442.png)
+
+## Using Event Hubs 
+- Private access is only available on Dedicated, Premium or Standard namespaces.
+- ![alt text](image-443.png)
+- Code for Event Hub in C# 
+```c#
+ class Program
+    {
+        private const string ehubNamespaceConnectionString = "Endpoint=sb://nishanthub789.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=DEnSU0+7Jzc6JEVZfqeFCU1bvMpn0AcPo+AEhJMAYTM=";
+        private const string eventHubName = "my-telemetry";        
+
+        static  async Task Main(string[] args)
+        {
+            // Read from the default consumer group: $Default
+            string consumerGroup = EventHubConsumerClient.DefaultConsumerGroupName;
+
+            // Create an event processor client to process events in the event hub
+            var consumer= new EventHubConsumerClient(consumerGroup, ehubNamespaceConnectionString, eventHubName);
+
+            Console.WriteLine("Waiting for messages...");
+
+            while (true)  {
+                await foreach (PartitionEvent partitionEvent in consumer.ReadEventsAsync())
+                {
+                    Console.WriteLine($"Message Received: {System.Text.Encoding.Default.GetString(partitionEvent.Data.Body.Span)}");                    
+                }
+            }  
+        }        
+    }
+
+```
+
+## Selecting the right Messaging Service 
+- ![alt text](image-444.png)
+
+## Current Architecture so far 
+- ![alt text](image-445.png)
+- Note that function is now triggered using Event Grid Topic and it is more secure as it only works if the event grid is triggered. 
+
+## Identity Management with Azure AD (Microsoft Entra ID)
+
