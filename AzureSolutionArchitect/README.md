@@ -2756,4 +2756,410 @@ namespace AzureCourse.Function
 - Note that function is now triggered using Event Grid Topic and it is more secure as it only works if the event grid is triggered. 
 
 ## Identity Management with Azure AD (Microsoft Entra ID)
+- Central Identity and Access Management cloud service
+- Used to manage access to thousands of apps (Among them- Azure Portal)
+- Secure, Robust and Highly intelligent 
+- ![alt text](image-446.png)
+- ![alt text](image-447.png)
+- ![alt text](image-448.png)
 
+### Tenant 
+- A specific instance of Azure AD containing accounts and groups 
+- Called also Directory 
+- Is not part of subscription hierarchy 
+- Exists beside the subscription 
+- For new subscriptions, a new tenant is created automatically. 
+- A tenant can be assigned to multiple subscriptions 
+- ![alt text](image-449.png)
+- Azure Active Directory is an external resource that can connect to many apps and one of them is Azure. 
+
+## Using Azure AD 
+- ![alt text](image-450.png)
+- ![alt text](image-451.png)
+- Switch between tenants(or directories here)
+- ![alt text](image-452.png)
+
+## Users and Groups 
+- 2 of the main 3 objects managed by Azure AD(other being Roles)
+- Manages and stores the users that are part of the tenant.
+- Groups the users in Groups Example: IT Admins, Developers etc. 
+- Allows defining roles to groups instead of each user. 
+- Create new user 
+- ![alt text](image-453.png)
+- View SignIn Logs 
+- ![alt text](image-454.png)
+- Add a new group 
+- ![alt text](image-455.png)
+
+## Azure AD Licenses 
+- Have great effect on the functionality and price of the Azure AD 
+- ![alt text](image-456.png)
+
+## Authentication Type 
+- Divided into 3 factors: 
+- ![alt text](image-457.png)
+- ![alt text](image-458.png)
+- ![alt text](image-459.png)
+- Two Factor Authentication = "Something you know" + "Something you have"
+- ![alt text](image-460.png)
+- Hacking fingerprint is more difficult 
+- Make sure authentication engine supports 2 factor authentication. 
+- Should come out of the box and should not require development 
+- This decision affects the end users. 
+
+## Azure AD Security Defaults 
+- Increases protection of the organization in the Free tier. 
+- Security defaults are basic identity security mechanisms recommended by Microsoft. When enabled, these recommendations will be automatically enforced in your organization. 
+- Administrators and users will be better protected from common identity-related attacks.
+- It basically adds preconfigured security settings 
+- ![alt text](image-461.png)
+- Has no additional cost 
+- For more fine-grained management, use Conditional Access(P1)
+- ![alt text](image-462.png)
+
+
+## RBAC(Role Based Access Control)
+- In the past, authorization was defined per user or per user group 
+- ![alt text](image-463.png)
+- What happens if David leaves the company? Admin will have to go through all the authorizations of David and remove them one by one. 
+- To solve this problem RBAC was implemented 
+- ![alt text](image-466.png)
+- In order to perform any operation or access any data in Azure, we need to have the right role. 
+- ![alt text](image-467.png)
+- When we created a new subscription in Azure, we were automatically granted the highest role in Azure called owner. 
+- In Azure we generally have 3 types of Roles: Owner, Contributor and Reader. 
+- ![alt text](image-468.png)
+- ![alt text](image-469.png)
+- ![alt text](image-471.png)
+- Note that in Azure, the users are defined inside the tenant but the Roles and Authorizations are part of Azure itself. 
+- It is always better to assign roles to groups and not individual users. Its easier to maintain. 
+
+## Using Azure Roles
+- ![alt text](image-472.png)
+- ![alt text](image-473.png)
+- ![alt text](image-474.png)
+- Earlier when we signed as David Jones, we were not able to do anything in the portal 
+- David Jones is part of Azure Architects Group and that group has just been granted Contributor Role over the test-rg resource group 
+- Now if we login as David Jones, we can see he has access to test-rg resource group.
+- ![alt text](image-475.png)
+- Since David Jones has contributor role, he cannot add Role Assignment 
+- ![alt text](image-476.png)
+
+## Managed Identities
+- The ability to assign Azure AD identity to an Azure Resource. 
+- The resource can connect to other Azure resources using this identity. 
+- No need to handle credentials(usernames, password etc)
+- Two types of Managed Identities:
+- System Assigned: Managed by Azure, tied to the resource's lifecycle(when the resource is deleted, so is the identity)
+- User Assigned: Managed by the user. Can be assigned to multiple resources, not tied to any lifecycle. 
+- Most of the times, we use system assigned identities. 
+- We can use system assigned managed identities to give access to the SQL server from our App Service. 
+- ![alt text](image-477.png)
+- ![alt text](image-478.png)
+- ![alt text](image-479.png)
+- ![alt text](image-480.png)
+- ![alt text](image-481.png)
+- Click on Set Admin 
+- ![alt text](image-482.png)
+- Click on Save 
+- Now we can create users inside our sql server database from the external provider 
+```sql 
+CREATE USER [<appservice-name>] FROM EXTERNAL PROVIDER
+
+ALTER ROLE db_datareader ADD MEMBER [<appservice-name>]
+
+ALTER ROLE db_datawriter ADD MEMBER [<appservice-name>] 
+
+```
+- ![alt text](image-483.png)
+- Now we will remove the username, password from the connection string specified inside the App Service Configuration and replace it with Managed Identity 
+- ![alt text](image-484.png)
+- When we save, the App service will restart and we can still connect to the database using Managed Identity and not using username/password and this is much more secure and it is the recommended way to connect between Azure Resources rather than using username/password. 
+
+## Using Azure AD inside applications 
+- Azure AD can be used as authentication engine on other applications
+- Not just the Azure Portal
+- It can be used inside our own application also .
+- What is the process to use Azure AD in our application?
+- Register the application in Azure AD 
+- Add code to use Azure AD as the authentication engine. 
+- For App Services, this can be configured via the Portal itself (no code changes required)
+- Authentication itself, uses OAuth and JWT. 
+
+## OAuth2.0
+- Standard protocol for authentication and authorization.
+- Widely used, mainly in web apps. 
+### OAuth2.0 components 
+- ![alt text](image-485.png)
+
+### OAuth2.0 Flow
+- ![alt text](image-486.png)
+- Lets see how it works 
+- Click on Login. It will ask which authorization server to use
+- ![alt text](image-487.png)
+- We select Facebook 
+- ![alt text](image-488.png)
+- It will ask us to Grant Access to the app to access private information. 
+- Once we provide access, we can login to Feedly 
+- ![alt text](image-489.png)
+- For App Registration
+- Authorization Server should be familiar with the Resource Server (API)
+- Resource Server must register itself with the Authorization Server also called App Registration.
+- We can also use Github as an authorization server
+- Here is how App Registration works with Github 
+- ![alt text](image-490.png)
+- We will specify details of the application and specify the Authorization callback URL 
+- ![alt text](image-491.png)
+- Now application is registered 
+- ![alt text](image-492.png)
+- We have client ID and client secret 
+- Resource server must pass these 2 keys to the authorization server 
+- Access Token is a JWT 
+- JWT contains the data the server needs in order to authenticate the user 
+- JWT has 3 sections:
+- Header: type of Token(JWT) and signing algorithm 
+- ![alt text](image-493.png)
+- Payload - Actual data about the user
+- ![alt text](image-494.png)
+- Signature
+- 3 parts of the JWT are base64 encoded and concatenated with a . 
+- ![alt text](image-495.png)
+
+
+## Configuring Azure AD with the App Service for Authentication 
+- Click on Authentication
+- ![alt text](image-496.png)
+- Add an Identity Provider 
+- ![alt text](image-497.png)
+- Select Microsoft Identity Provider 
+- Create new app registration --> Entity in Azure AD that defines the data required to authenticate to our web app. For e.g it defines the callback URL, the type of token that is going to be used, all other metadata for the authentication. 
+- ![alt text](image-498.png)
+- ![alt text](image-499.png)
+- When we select Current tenant- we mean that only users from this tenant can access this app/ 
+- For authentication we need the following settings 
+- ![alt text](image-500.png)
+- ![alt text](image-501.png)
+- Now authentication is enabled for the App Service
+- Inside the Microsoft Entra ID also, we can see this App Registration 
+- ![alt text](image-502.png)
+- ![alt text](image-503.png)
+- Note that callback URI is created automatically by the App Service
+- ![alt text](image-504.png)
+- Notice that we are going to pass the ID Token. 
+
+## Adapting code of the App Service to work with Azure AD    
+- When we try to access the app, we will see this screen now
+- ![alt text](image-505.png)
+- Now we are automatically being requested to login through Azure AD. 
+- However now the application running inside the App Service should know about the logged in user also 
+- So we need to configure the App to use the Azure AD authentication also 
+- Add the following nuget packages to the application 
+```shell 
+dotnet add package Microsoft.Identity.Web
+dotnet add package Microsoft.AspNetCore.Authentication.OpenIdConnect
+dotnet add package Microsoft.Identity.Web.UI
+```
+- Add the following code to Program.cs 
+```c#
+  // Azure AD authentication support
+            services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme).AddMicrosoftIdentityWebApp(Configuration.GetSection("AzureAd"));
+   // Add support for UI elements of the authentication process
+   services.AddRazorPages().AddMicrosoftIdentityUI();  
+
+
+ //In middleware pipeline add this 
+ app.UseAuthentication()
+ app.UseAuthorization()        
+
+```
+- Inside appsettings.json we have the following:
+```json 
+{
+  "AzureAd": {
+    "Instance": "https://login.microsoftonline.com/",
+    "TenantId": "TENANT_ID",
+    "ClientId": "APP_REGISTRATION_CLIENT_ID",
+    "CallbackPath": "/signin-oidc"
+  },
+
+```
+- ![alt text](image-506.png)
+- ![alt text](image-507.png)
+- ![alt text](image-508.png)
+- To check if the user is logged in, use this code
+```c#
+  @if (User.Identity.IsAuthenticated)
+                {
+                    <ul class="nav navbar-nav navbar-right">
+                        <li>Hello @User.Claims.First(c=>c.Type=="name").Value!
+                        </li>                        
+                    </ul>
+                }
+                else
+                {
+                    <ul class="nav navbar-nav navbar-right">
+                        <li>Anonymous User</li>
+                    </ul>
+                }
+
+}
+```
+- To view all the claims about the user in the JWT token use this code:
+```c#
+ public class ClaimsModel : PageModel
+    {
+        public IEnumerable<Claim> UserClaims { get; set; }
+        public void OnGet()
+        {
+            UserClaims = HttpContext.User.Claims;
+        }
+    }
+
+
+  @if (HttpContext.User.Identity.IsAuthenticated)
+            {
+                foreach (var c in Model.UserClaims)
+                {
+                    <tr>
+                        <td>@c.Type</td>
+                        <td>@(c.Value.Length > 100 ? c.Value.Substring(0, 100) : c.Value)</td>
+                    </tr>
+                }
+            }
+            else
+            {
+                <tr>
+                    <td>Current Status</td>
+                    <td><strong>Not Authenticated</strong></td>
+                </tr>
+            }
+
+```
+- Now the code correctly identifies the user from the claims in the token 
+- ![alt text](image-509.png)
+- ![alt text](image-510.png)  
+- The aud contains the client ID for the app registration 
+- We can see details like name,email of the user 
+- To check the JWT token sent from Azure AD use this link: http://<app-service-url>/.auth/me
+- ![alt text](image-511.png)
+
+
+## Azure AD B2C 
+- Identity-as-a-service for our application
+- A business to customer (B2C) service
+- Enable integrating identity services in your app. 
+- Allows working with various identity providers 
+- Provides various user flows
+- Enables customization to these user flows 
+- ![alt text](image-512.png)
+- Good thing is we can include all these features without really including much code in our application
+- Difference between Azure AD and Azure AD B2C 
+- Azure AD is an Identity Provider and Azure AD B2C is an identity service(used for signin, signup, reset password etc. )
+- ![alt text](image-513.png)
+- Azure AD B2C supports various authentication features 
+- MFA
+- Conditional Access
+- Audit Log
+- Custom Policies
+- Custom Pages
+- Azure AD B2C is quite complex to setup and has lot of moving parts 
+- Azure AD B2C provides a secure and customizable way for businesses to allow customers to sign up and sign in to their applications. Here’s how it works:
+- Sign-Up and Sign-In Options: Customers can use social accounts (e.g., Facebook, Google) or create local accounts with their email addresses and passwords.
+- Multi-Factor Authentication (MFA): It supports MFA to enhance security, requiring users to verify their identity with an additional step, like a text message or authenticator app.
+- Customizable User Experience: Businesses can fully brand the sign-up, sign-in, and password reset pages to match their own look and feel, ensuring a seamless integration with their applications.
+- User Flows and Policies: You can define policies to control how users interact with your app, such as the steps for signing up, signing in, or resetting passwords.
+
+
+## User Flows in Azure AD B2C
+- Azure AD B2C User Flows are predefined policies that simplify the process of implementing common identity scenarios in your applications, such as signing up, signing in, and resetting passwords.
+- They act as templates, allowing you to quickly set up secure authentication experiences for your users without needing to build everything from scratch.
+- User Flows are built-in, configurable policies in Azure AD B2C that define the steps users go through during identity-related actions.
+- Each User Flow is designed for a specific purpose and can be customized to some extent, such as branding or adding basic user attributes.
+- They handle the user interface, validation, and interaction with Azure AD B2C, so you don’t have to implement these features manually in your application.
+- Here are some common types of User Flows:
+- Sign up and sign in: Allows users to create a new account or log in with an existing one.
+- Profile editing: Enables users to update their profile information.
+- Password reset: Guides users through the process of resetting their forgotten password.
+- Sign in only: For scenarios where users already have accounts and just need to log in.
+- Create User Flows: Set up the necessary User Flows in the Azure portal under User Flows. For example:
+- Create a Sign up and sign in flow named **B2C_1_signup_signin**.
+- Create a Password reset flow named **B2C_1_passwordreset**.
+- Add authentication to the web app with this code:
+```c#
+ builder.Services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
+    .AddMicrosoftIdentityWebApp(builder.Configuration.GetSection("AzureAdB2C"));
+
+```
+- In the appsettings.json file of our asp.net mvc web app add the following settings:
+```json 
+ {
+  "AzureAdB2C": {
+    "Instance": "https://your-tenant-name.b2clogin.com",
+    "ClientId": "your-client-id",
+    "Domain": "your-tenant-name.onmicrosoft.com",
+    "SignUpSignInPolicyId": "B2C_1_signup_signin",
+    "ResetPasswordPolicyId": "B2C_1_passwordreset",
+    "EditProfilePolicyId": "B2C_1_editprofile"  // Optional
+  }
+}
+
+```
+- Use the [Authorize] attribute to restrict access to authenticated users only.
+```c#
+ [Authorize]
+public class AccountController : Controller
+{
+    public IActionResult Profile()
+    {
+        // Only accessible to authenticated users
+        return View();
+    }
+}
+
+```
+- Handle Sign-In and Sign-Out:
+- Sign-In: When a user tries to access a protected resource (e.g., /Account/Profile), they’ll be redirected to the Azure AD B2C sign-in page defined by the B2C_1_signup_signin flow. After authentication, they’re redirected back to your app.
+- Sign-Out: Add a sign-out action to clear the session.
+```c#
+ public async Task<IActionResult> SignOut()
+{
+    await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+    await HttpContext.SignOutAsync(OpenIdConnectDefaults.AuthenticationScheme);
+    return RedirectToAction("Index", "Home");
+}
+```
+- Customize User Flows (Optional)
+To match your application’s branding:
+- In the Azure portal, go to User Flows > Page layouts.
+- Upload custom HTML/CSS files to style the sign-in, sign-up, or password reset pages.
+- A user clicks "Create Account" or "Login" and is redirected to the B2C_1_signup_signin flow.
+- After signing up or signing in, they’re redirected back to your site (e.g., /Home/Index). You can access their claims (e.g., User.FindFirst("emails")?.Value) to display a personalized greeting.
+- In your app, the authentication middleware handles redirects to the appropriate User Flow based on the action (e.g., sign-in, password reset), ensuring a seamless experience.
+
+
+## Current Architecture
+- ![alt text](image-515.png)
+
+## Synchronizing Azure AD with On-Prem AD 
+- Many organizations want to sync their on-prem Active Directory with Azure AD 
+- Useful when organization has apps on-prem and in cloud and want to have a single user base 
+- We use Azure AD Connect 
+- ![alt text](image-516.png)
+- 2 modes of authentication with Azure AD Connect 
+- ![alt text](image-517.png)
+- There are pros and cons of each approach. Password Hash Sync is useful when the on-prem server is down
+- Pass-Through is more secure as the data of the organization is located physically closer to them 
+
+## Monitoring in Azure
+- A working app is not enough
+- We must know its status, how it performs and when it has problems
+- This is done via monitoring
+- Azure offers lot of built in monitoring mechanisms
+- There is a centralized monitoring hub where all monitoring data is streamed and can be queried or used for triggers 
+- Very cost effective in Azure
+- Monitoring is based on 2 types of data: metrics and logs
+- ![alt text](image-518.png)
+- Almost every resource in Azure has "Monitoring" section 
+- ![alt text](image-520.png)
+
+## Using Metrics
