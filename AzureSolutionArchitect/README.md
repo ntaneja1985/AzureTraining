@@ -3491,3 +3491,326 @@ customMetrics
 - ![alt text](image-588.png)
 
 ## Security in Azure
+- Azure offers lot of security measures for its resources
+- We need to follow security patterns to avoid security incidents
+
+## VM Security Best Practicies
+- Restrict access to VM as much as possible
+- Make sure only required ports are open to the internet(22/1389/443/80)
+- Limit access to specific IP addresses when possible
+- Prefer using Bastion for accessing the VM, so no need for open ports 
+- If VM is not public facing, place it in a Vnet that is not connected to the internet 
+
+## Networking Security Best Practices 
+- Vnets that contain private resources only-should not be exposed to the internet 
+- Always use NSG to restrict access to subnets 
+- Use service endpoints/private endpoints to restrict access to the resources 
+- Use the Hub and Spoke Security Model 
+- ![alt text](image-589.png)
+- Only the App GW has access to public internet 
+
+## Database Security Best Practices 
+- Use encryption at rest and encryption at transit(usually ON by default)
+- Connect DB to relevant Vnet using Service Endpoint/Private Endpoints
+- Access DB from the app using Managed Identities only 
+- Use DB's firewall rule to restrict external access(only specific IPs should be allowed)
+
+## App Service Security Best Practices 
+- Dont expose directly to the internet, use Application Gateway 
+- Connect to App GW's Vnet using Service Endpoint/Private Endpoint 
+- Use Azure AD for authentication, enforce MFA 
+- Use Managed Identity to access other resources when possible 
+
+
+## KeyVault 
+- Many apps have secrets that need to be kept safely: Connection Strings, Keys, Certificates, API Keys 
+- Usually kept in configuration files, so not really secure 
+- Keyvault stores secrets of various types 
+- Very restricted access - needs Azure AD authentication 
+- Support Hardware Security Modules (for enhanced security)
+- Easily Manageable 
+- Accessed via REST API 
+- Very cost effective 
+- ![alt text](image-590.png)
+- Operation = Reading a secret from the key vault. 
+- Security: Secrets are encrypted at rest and in transit, with access tightly controlled via Azure AD.
+- Centralized Management: Update a secret in one place, and all apps using it get the new value.
+- Auditability: Logs track who accessed what and when.
+- Integration: Works seamlessly with other Azure services and .NET apps.
+- Go to the Azure Portal, create a Key Vault, and note its URI (e.g., https://myvault.vault.azure.net/).
+- Add a secret (e.g., name: MyApiKey, value: supersecret123).
+- Grant Access:
+- Assign your app or user permissions via "Access policies" in the Key Vault (e.g., "Get" secrets).
+- Use a service principal or managed identity for your app.
+- Install nuget packages 
+```shell 
+ dotnet add package Azure.Identity
+dotnet add package Azure.Security.KeyVault.Secrets
+
+```
+- Here’s how to fetch a secret using the SecretClient with a managed identity or service principal.
+```c#
+ using Azure.Identity;
+using Azure.Security.KeyVault.Secrets;
+using System;
+using System.Threading.Tasks;
+
+class Program
+{
+    static async Task Main(string[] args)
+    {
+        string keyVaultUrl = "https://myvault.vault.azure.net/";
+        string secretName = "MyApiKey";
+
+        try
+        {
+            // Authenticate using DefaultAzureCredential (tries managed identity, env vars, etc.)
+            var credential = new DefaultAzureCredential();
+            var client = new SecretClient(new Uri(keyVaultUrl), credential);
+
+            // Get the secret
+            KeyVaultSecret secret = await client.GetSecretAsync(secretName);
+            Console.WriteLine($"Secret value: {secret.Value}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+    }
+}
+
+```
+- DefaultAzureCredential handles authentication flexibly (e.g., via Visual Studio, Azure CLI, or a managed identity).
+- SecretClient connects to your Key Vault and retrieves the secret by name.
+- Run this locally with az login or deploy it to Azure with a managed identity configured.
+- Storing and Updating a Secret
+- You can also set or update secrets programmatically (if your app has "Set" permissions).
+```c#
+ using Azure.Identity;
+using Azure.Security.KeyVault.Secrets;
+using System;
+using System.Threading.Tasks;
+
+class Program
+{
+    static async Task Main(string[] args)
+    {
+        string keyVaultUrl = "https://myvault.vault.azure.net/";
+        string secretName = "MyApiKey";
+
+        var credential = new DefaultAzureCredential();
+        var client = new SecretClient(new Uri(keyVaultUrl), credential);
+
+        try
+        {
+            // Set a new secret
+            string newValue = "newsecret456";
+            await client.SetSecretAsync(secretName, newValue);
+            Console.WriteLine($"Set secret '{secretName}' to '{newValue}'");
+
+            // Retrieve it to confirm
+            KeyVaultSecret secret = await client.GetSecretAsync(secretName);
+            Console.WriteLine($"Retrieved secret: {secret.Value}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+    }
+}
+```
+- SetSecretAsync creates a secret if it doesn’t exist or updates it if it does.
+- Each update creates a new version of the secret—Key Vault keeps the history.
+- Here’s a more practical example: fetching a database connection string from Key Vault for use in a .NET app.
+```c#
+  using Azure.Identity;
+using Azure.Security.KeyVault.Secrets;
+using Microsoft.Data.SqlClient;
+using System;
+using System.Threading.Tasks;
+
+public class DatabaseService
+{
+    private readonly string _connectionString;
+
+    public DatabaseService(string keyVaultUrl, string secretName)
+    {
+        _connectionString = GetSecretAsync(keyVaultUrl, secretName).GetAwaiter().GetResult();
+    }
+
+    private static async Task<string> GetSecretAsync(string keyVaultUrl, string secretName)
+    {
+        var credential = new DefaultAzureCredential();
+        var client = new SecretClient(new Uri(keyVaultUrl), credential);
+        KeyVaultSecret secret = await client.GetSecretAsync(secretName);
+        return secret.Value;
+    }
+
+    public async Task QueryDatabaseAsync()
+    {
+        try
+        {
+            using (var connection = new SqlConnection(_connectionString))
+            {
+                await connection.OpenAsync();
+                Console.WriteLine("Database connection successful!");
+                // Your DB logic here...
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"DB Error: {ex.Message}");
+        }
+    }
+}
+
+class Program
+{
+    static async Task Main(string[] args)
+    {
+        string keyVaultUrl = "https://myvault.vault.azure.net/";
+        string secretName = "DbConnectionString";
+
+        var dbService = new DatabaseService(keyVaultUrl, secretName);
+        await dbService.QueryDatabaseAsync();
+    }
+}
+
+```
+- The connection string isn’t in your code or config files.
+- You can rotate it in Key Vault without redeploying your app.
+
+### Working with Keys and Certificates
+- Key Vault isn’t just for secrets—it handles cryptographic keys and certificates too. Here’s how to encrypt data with a key
+```c#
+ using Azure.Identity;
+using Azure.Security.KeyVault.Keys;
+using System;
+using System.Text;
+using System.Threading.Tasks;
+
+class Program
+{
+    static async Task Main(string[] args)
+    {
+        string keyVaultUrl = "https://myvault.vault.azure.net/";
+        string keyName = "MyEncryptionKey";
+
+        var credential = new DefaultAzureCredential();
+        var keyClient = new KeyClient(new Uri(keyVaultUrl), credential);
+
+        try
+        {
+            // Get the key (assumes you’ve created an RSA key in Key Vault)
+            KeyVaultKey key = await keyClient.GetKeyAsync(keyName);
+            var cryptoClient = new CryptographyClient(key.Id, credential);
+
+            // Encrypt some data
+            string plaintext = "Sensitive data";
+            byte[] plaintextBytes = Encoding.UTF8.GetBytes(plaintext);
+            EncryptResult encryptResult = await cryptoClient.EncryptAsync(EncryptionAlgorithm.RsaOaep, plaintextBytes);
+            Console.WriteLine($"Encrypted: {Convert.ToBase64String(encryptResult.Ciphertext)}");
+
+            // Decrypt it
+            DecryptResult decryptResult = await cryptoClient.DecryptAsync(EncryptionAlgorithm.RsaOaep, encryptResult.Ciphertext);
+            string decryptedText = Encoding.UTF8.GetString(decryptResult.Plaintext);
+            Console.WriteLine($"Decrypted: {decryptedText}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+    }
+}
+```
+- Authentication: Prefer managed identities over client secrets for Azure-hosted apps.
+- Error Handling: Retry on transient failures (e.g., network issues) with libraries like Polly.
+- Caching: Cache secrets in memory to reduce Key Vault calls, but refresh periodically.
+- Access Control: Use least-privilege policies—don’t give blanket permissions.
+- Rotation: Rotate secrets and keys regularly, and use Key Vault’s versioning to manage transitions.
+
+
+## Configuring the KeyVault
+- Setup the Keyvault on the Azure Portal
+- Set up Access Policy as Azure RBAC 
+- ![alt text](image-591.png)
+- Add Diagnostic Settings for the keyvault and collect logs from this into the Log Analytics Workspace
+- To view secrets in the keyvault add a role assignment of Key Vault security officer to yourself
+- ![alt text](image-592.png)
+- Now we can add the secret like this 
+- ![alt text](image-593.png)
+- In the appsettings.json of our catalog project add this and remove the BooksDb connection string 
+```json
+ {
+  
+  "KeyVault":{
+    "BaseUrl": "https://nishantkeyvault1985.vault.azure.net/"
+  }
+}
+
+
+```
+- To configure Key vault in catalog project add this nuget package:
+```shell
+ dotnet add package Microsoft.Extensions.Configuration.AzureKeyVault
+
+```
+- Now setup Program.cs file to use the Azure Key vault like this 
+```c#
+ public static IHostBuilder CreateHostBuilder(string[] args) =>
+            Host.CreateDefaultBuilder(args)
+                .ConfigureWebHostDefaults(webBuilder =>
+                {
+                    webBuilder.UseStartup<Startup>()
+                    .ConfigureAppConfiguration((ctx, builder)=>  {
+                        var config=builder.Build();
+                        builder.AddAzureKeyVault(config["KeyVault:BaseUrl"]);
+                    });
+
+                });
+    }
+
+```
+- Now publish the code 
+- Upload the code to catalog VM
+- If we directly run the code from the VM it will not work
+- This is because we are yet to allow access from the VM to the Key Vault. 
+- ![alt text](image-594.png)
+- Catalog VM must have a role that allows it to access the secrets from the KeyVault
+- Assign a Managed Identity to the VM 
+- ![alt text](image-595.png)
+- Add a role assignment to the catalog VM managed identity 
+- Catalog VM just needs to read the secrets so we will assign the role of Key Vault Secrets User 
+- ![alt text](image-596.png)
+- This role allows only reading of Key Vault contents
+- ![alt text](image-597.png)
+- Now restart the IIS 
+- Now everything works fine 
+- ![alt text](image-598.png)
+- We can also see insights of the KeyVault like this 
+- ![alt text](image-599.png)
+- Even though KeyVault is a cloud resource, you can actually use it from on-prem apps too. All you need to do is register the app in Azure AD, and so making it identifiable, and then add an access policy to the KeyVault allowing access to this identity.
+- KeyVault has an automatic fail-over mechanism, so that in the rare case of a complete region shut-down, requests to KeyVault are automatically routed to the paired region, where its data is replicated. You won't even know about it...
+
+
+## Defender for the Cloud(earlier called Security Center)
+- Central location for monitoring and alerting security related issues 
+- Displays a summarized list of problems found in the subscriptions resources
+- In some cases, allow a single click fix 
+- ![alt text](image-600.png)
+- We can see recommendations 
+- ![alt text](image-601.png)
+- ![alt text](image-602.png)
+- Looks like Snyk
+- ![alt text](image-603.png)
+- We can look at Security Alerts also 
+- ![alt text](image-604.png)
+
+## Current Architecture 
+- ![alt text](image-605.png)
+
+### To protect traffic from Vnets to Managed Services(like App Service), always use Private endpoints since they create a private IP inside the Vnet and donot use public IP and hence are more secure than Service Endpoints 
+
+## Disaster Recovery in Azure 
+
+
