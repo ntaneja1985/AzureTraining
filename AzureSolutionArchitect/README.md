@@ -3973,3 +3973,105 @@ class Program
 
 
 ## Azure Policy
+- Enforcing organizational standards and compliance at scale is not simple 
+- However it is important to do so in the cloud
+- Role based access helps a little, but it is not enough. More concerned with the permission aspect not the resource itself. 
+- We might have requirements like: 
+- ![alt text](image-660.png)
+- So we need Azure Policy 
+- ![alt text](image-661.png)
+### When are policies evaluated ?
+- ![alt text](image-662.png)
+### What happens with non-compliant resources ?
+- ![alt text](image-663.png)
+
+## Azure Policy Concepts 
+- ![alt text](image-664.png)
+- ![alt text](image-665.png)
+- ![alt text](image-666.png)
+
+## Adding a new Initiative
+- ![alt text](image-667.png)
+- Add a new policy definition
+- ![alt text](image-668.png)
+- ![alt text](image-669.png)
+- ![alt text](image-670.png)
+- Define the Policy Parameters like define the locations for the location policy
+- ![alt text](image-671.png)
+- ![alt text](image-672.png)
+- Now once the initiative is created, we need to assign it to a scope(i.e where this initiative will take effect)
+- ![alt text](image-673.png)
+- ![alt text](image-674.png)
+- If any VM is created which violates this initiative, we will deny its creation.
+
+
+## Custom Policies 
+- We can create our own policies also 
+- But first look closely at existing definitions and samples 
+- Policy definitions are JSON based documents 
+- They describe various properties of the policy and the rule 
+- ![alt text](image-675.png)
+- The above policy denies the creation of storage accounts where HTTP traffic is allowed
+- We have a condition with 2 condition in it
+- We have a policy rule that has this condition which use the parameters of effectType. 
+```json 
+ {
+    "properties": {
+        "displayName": "Deny storage accounts not using only HTTPS",
+        "description": "Deny storage accounts not using only HTTPS. Checks the supportsHttpsTrafficOnly property on StorageAccounts.",
+        "mode": "all",
+        "parameters": {
+            "effectType": {
+                "type": "string",
+                "defaultValue": "Deny",
+                "allowedValues": [
+                    "Deny",
+                    "Disabled"
+                ],
+                "metadata": {
+                    "displayName": "Effect",
+                    "description": "Enable or disable the execution of the policy"
+                }
+            }
+        },
+        "policyRule": {
+            "if": {
+                "allOf": [
+                    {
+                        "field": "type",
+                        "equals": "Microsoft.Storage/storageAccounts"
+                    },
+                    {
+                        "field": "Microsoft.Storage/storageAccounts/supportsHttpsTrafficOnly",
+                        "notEquals": "true"
+                    }
+                ]
+            },
+            "then": {
+                "effect": "[parameters('effectType')]"
+            }
+        }
+    }
+}
+
+```
+- ![alt text](image-676.png)
+- Now we can assign a policy definition to a resource group 
+- ![alt text](image-677.png)
+- Now we can look at Compliance section 
+- ![alt text](image-678.png)
+- We can see the non-compliant resources 
+- ![alt text](image-679.png)
+- ![alt text](image-680.png)
+
+## What happens when we create a resource that violates a policy 
+- ![alt text](image-681.png)
+- We cannot select any other size for the VM as the policy restricts us
+- ![alt text](image-682.png)
+- We can see policy affects creation of a new virtual machine. 
+- We can also try creating a storage account that allows HTTP traffic also 
+- ![alt text](image-683.png)
+- We get this error: 
+- ![alt text](image-684.png)
+
+## Containers in Azure 
