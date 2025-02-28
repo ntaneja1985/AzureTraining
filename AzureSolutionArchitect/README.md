@@ -3812,5 +3812,145 @@ class Program
 ### To protect traffic from Vnets to Managed Services(like App Service), always use Private endpoints since they create a private IP inside the Vnet and donot use public IP and hence are more secure than Service Endpoints 
 
 ## Disaster Recovery in Azure 
+- A plan to recover from a complete shutdown of a Region 
+- Some apps require it, some dont 
+- Might have substantial cost aspects 
+- Complete shutdown of a region is extremely rare 
+- How to setup DR 
+- ![alt text](image-606.png)
+- ![alt text](image-608.png)
+- ![alt text](image-609.png)
+
+## DR Concepts 
+- Hot/Cold DR 
+- ![alt text](image-610.png)
+- ![alt text](image-611.png)
+- RPO/RTO (Recovery Point Object, Recovery Time Object )
+- RPO --> Data
+- RTO --> Time
+- ![alt text](image-612.png)
+- ![alt text](image-613.png)
 
 
+## Basics of DR Implementation 
+- if RTO is low, we need Active Resources, if it high we can have Passive Resources 
+- if RPO is low, we need data synchronization, if RPO is high, we need Backup 
+- ![alt text](image-615.png)
+- ![alt text](image-616.png)
+
+## DR of Data in Azure 
+- Main question when designing the DR of data is: What is the RPO (Or how much data loss can we tolerate)
+- If RPO = 0(i.e no data loss in case of disaster)
+- We need database that always syncs with the secondary region 
+- Currently 3 such databases in Azure 
+- Azure SQL(with Geo Replication and Failover Group)
+- Cosmos DB(with multi-region account)
+- Azure Storage(with GRS redundancy)
+- ![alt text](image-617.png)
+- ![alt text](image-618.png)
+- ![alt text](image-619.png)
+- ![alt text](image-620.png)
+- ![alt text](image-621.png)
+- Note we can select the backup from the most recent Geo redundant server. 
+- The RPO here, is minimum 5 minutes(i.e the backup frequency)
+- The second example is much cheaper, we dont need a secondary active database when the primary is active. 
+
+## DR of Compute in Azure 
+- Main question when designing the DR of compute is: What is the RTO(or how much downtime can we tolerate?)
+- If RTO = 0 (no downtime in case of disaster, compute in secondary region must always be up and running)
+- ![alt text](image-622.png)
+- If RTO > 0(some downtime is tolerated)
+- ![alt text](image-623.png)
+- ![alt text](image-624.png)
+- ![alt text](image-625.png)
+- Second example is much cheaper, no secondary active compute is needed when primary is active 
+- If RTO is 0, we pay twice both for primary and secondary region resources 
+- If RTO > 0, we only pay once. 
+
+## Routing in DR 
+- During DR, users should be routed to secondary region 
+- ![alt text](image-626.png)
+- ![alt text](image-627.png)
+- ![alt text](image-628.png)
+- ![alt text](image-629.png)
+- For automatic routing in case of DR, Azure has 2 main services: Azure Traffic Manager and Azure Front Door 
+
+
+## Azure Traffic Manager 
+- DNS-based traffic load balancer 
+- Enables Traffic Distribution across global Azure regions 
+- Provides high availability and responsiveness 
+- ![alt text](image-630.png)
+- 6 Algorithms for Routing in Traffic Manager 
+- ![alt text](image-631.png)
+- Priority Algorithm helps us in case of DR. 
+- ![alt text](image-632.png)
+- Very Cost Effective. 
+- ![alt text](image-633.png)
+- ![alt text](image-634.png)
+- ![alt text](image-635.png)
+- ![alt text](image-636.png)
+- Observe the Failover settings: These settings basically describe how frequently the Traffic Manager will look at the health probes of the endpoints 
+- If there is a problem with the endpoint and if it persists across 3 failures, we will route it to the secondary endpoint(DR)
+- Go to Endpoints in Traffic Manager 
+- Add the endpoints 
+- ![alt text](image-637.png)
+- Create a new App Service which will be the DR site of the first App Service(Choose a different region)
+- ![alt text](image-638.png)
+- So now we have 2 App services, original one and the DR one 
+- Add another endpoint to Traffic Manager (set Priority to 2)
+- ![alt text](image-639.png)
+- Now stop the first App Service(we are simulating a region shutdown)
+- Now Azure Traffic Manager will route traffic automatically to the secondary endpoint. 
+- ![alt text](image-640.png)
+- Note we are still using the same URL, but DR now works automatically. 
+
+## Azure Front Door 
+- Global entry point for web apps 
+- Works on Layer 7(HTTP/HTTPS)
+- Multiple routing methods 
+- Similar to Application Gateway but on Global Scale 
+- Here we have the following features 
+- URL- path based routing 
+- Session affinity 
+- SSL offloading 
+- Web Application Firewal (WAF) integration 
+- URL Rewrites
+- HTTP/2 support 
+- Similar to Application Gateway 
+- ![alt text](image-641.png)
+- Create Front Door Profile 
+- ![alt text](image-642.png)
+- Now Azure Front Door also includes CDN 
+- We will go with Azure Front Door Classic. 
+- ![alt text](image-643.png)
+- Similar to Application Gateway 
+- ![alt text](image-644.png)
+- ![alt text](image-645.png)
+- ![alt text](image-646.png)
+- Add the second backend also (set priority to 2)
+- ![alt text](image-647.png)
+- Change Probe interval to 10 seconds and set sample size to 1 (means that after 1st failure, front door will route to app service)
+- ![alt text](image-648.png)
+- Now lets setup routing rules 
+- ![alt text](image-649.png)
+- now front door is created
+- ![alt text](image-650.png)
+- Now simulate a DR scenario and stop the first App Service 
+- Now Front Door will automatically route to the secondary App Service 
+- ![alt text](image-651.png)
+- Direct access to the App Service should not be allowed
+- Traffic to the App Service should come directly from Azure Front Door 
+- Go to the App Service and add an Access Restriction 
+- ![alt text](image-652.png)
+- ![alt text](image-653.png)
+- If we try to access the app service directly, then we will get 403 Forbidden error 
+- Now traffic is only allowed through FD 
+
+## Traffic Manager vs Front Door 
+- ![alt text](image-654.png)
+
+## Current Architecture so far
+- ![alt text](image-655.png)
+
+## Managing Costs in Azure 
