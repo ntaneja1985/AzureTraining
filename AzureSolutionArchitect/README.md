@@ -3954,3 +3954,22 @@ class Program
 - ![alt text](image-655.png)
 
 ## Managing Costs in Azure 
+- Costs should be Transparent, Predictable and Monitored 
+- Avoid Surprises
+- Azure Cost Management is central hub for all cost aspects 
+- It can make predictions 
+- Enable alerts 
+- Can manage costs of resources outside Azure like AWS or GCP 
+- ![alt text](image-656.png)
+- ![alt text](image-657.png)
+- Application Gateway is one of the most expensive services in Azure 
+- ![alt text](image-658.png)
+- We can even filter by Location and Dates to view the Cost Analysis 
+- We can also view costs per resource group.
+- We can define budgets for our subscription
+- We can also specify alerts when we cross 90% of our budget 
+- We can also take a look at advisor recommendations
+- ![alt text](image-659.png)
+
+
+## Azure Policy
