@@ -4075,3 +4075,489 @@ class Program
 - ![alt text](image-684.png)
 
 ## Containers in Azure 
+- In Azure we have Azure Container Apps 
+- This service combines the power and flexibility of Azure Kubernetes Services (AKS) with simplicity and ease of use, and provides unmatched way of working with containers in Azure, while providing also autoscaling, logging, monitoring and security.
+- Azure offers various services for working with containers 
+- Azure container apps is the newest container based services 
+- ![alt text](image-686.png)
+- Azure Open Shift offers max control but requires time and effort to setup. On the other hand, Azure Function Apps are the easiest to setup but offers little control over the underlying container 
+
+
+## Containers in Azure Functions 
+- Azure functions can be deployed as a Linux container
+- Function code is containerized and pushed to the registry 
+- Function pulls the image from registry and runs it 
+- Takes advantage of all Function app capabilities like:
+- Serverless, autoscaling, authentication and more. 
+
+
+## Azure container instance 
+- Simple and effective container runtime environment 
+- Just upload the container and it runs 
+- No complex configuration 
+- No advanced capabilities like autoscaling etc. 
+
+## Containers in App Service 
+- Web App for container capability supports containers in App Service 
+- Pulls the container from the registry and it runs in App Service 
+- Takes advantage of all the App Service capabilities like Autoscaling, load balancing, authentication and more. 
+
+
+## Azure Kubernetes Service (AKS)
+- Fully managed K8s in the cloud 
+- Supports all of K8s capabilities 
+- No need to deal with virtual machines 
+- Supports automatic upgrade 
+
+
+## Azure Red Hat OpenShift
+- Fully managed Red Hat OpenShift platform 
+- Built on top of K8s and adds a lot of features 
+- Offers lot of automation, no need to deploy yaml files or docker files, we can just directly deploy from github directly to Azure Red Hat Open Shift
+- Also offers a developer console and CLI to talk directly to the worker nodes running the app
+- Offers high availability 
+- Over the air upgrades
+- Joint engineering effort from Microsoft and Red Hat. 
+
+## Azure Container Registry 
+- Fully managed registry for Docker images
+- Geo replicated
+- Can build the images 
+- Can scan images for vunerabilities 
+- Used by all container services in Azure 
+
+## Azure Container Apps 
+- ![alt text](image-687.png)
+- Sits somewhere in the middle 
+- Gives good control and is also easy to use and hence support productivity
+- Azure Container Apps is a PaaS offering that lets you deploy and run containers with automatic scaling, minimal configuration, and built-in features like traffic splitting and observability. It abstracts away much of the Kubernetes complexity, sitting between raw Azure Kubernetes Service (AKS) and fully serverless Azure Functions.
+
+
+## Azure Container Apps 
+- Build and deploy fully managed apps and microservices using serverless containers 
+- No need for K8s or underlying infrastructure 
+- Supports sophisticated autoscaling with KEDA
+- Has ingress configuration for traffic security 
+- Inter-service communication with Dapr 
+- Rich logging and monitoring 
+- SLA is 99.95% 
+
+### Scenarios Supported 
+- With container apps, we can deploy various types of apps 
+- ![alt text](image-688.png)
+- It can even run background processes using Azure Container Jobs 
+
+
+## Architecture of Container Apps 
+- ![alt text](image-689.png)
+- Environment in Container Apps: Boundary around one or more container app 
+- Powers the underlying infrastructures
+- Provides the Vnet used by container apps 
+- We can use an existing Vnet 
+- Provides unified logging and monitoring 
+- Environment handles OS upgrades, scale, failover, balancing and more. 
+- We can use Auto-generated Vnet or existing Vnet  
+- Note that generated vnet cannot access other resources in other vnets 
+- ![alt text](image-690.png)
+- We also need to decide to choose between single environment or multiple environments for container app
+- ![alt text](image-691.png)
+- We also need to know about Environment Types 
+- ![alt text](image-692.png)
+- Creating Environment 
+- Environments are created as part of Container Apps deployment 
+- Can also be created separately 
+
+
+## Container App
+- Where the container actually runs 
+- Uses the environment's resources like networking, logging, security 
+- Main entry point in the portal  
+- Has its own revision, replicas etc 
+
+## Revision 
+- Manages the version of the container app 
+- Container app runs a revision or it runs a specific version of the container app 
+- Each revision is a snapshot of the version that was deployed 
+- Once deployed-cannot be changed 
+- Every deployment creates a new revision 
+- Up to 100 revisions per container app 
+
+## Revision Characteristics 
+- Multiple revisions can be active, allowing traffic splitting between revisions 
+- ![alt text](image-693.png)
+- What is traffic splitting 
+- When multiple revisions are active, traffic can be split between them 
+- Very useful for various deployment scenarios like Rolling deployment 
+- In Rolling deployment, instances are updated gradually in batches 
+- Only if no errors are found, the deployment resumes  
+- Initially we have version v1 running 
+- ![alt text](image-694.png)
+- Then we update one instance of the app with v2 
+- ![alt text](image-695.png)
+- If there are no errors we update the second instance 
+- ![alt text](image-696.png)
+- If again there are no errors we update the third instance 
+- ![alt text](image-697.png)
+- ![alt text](image-698.png)
+- We split the traffic incrementally and then move all traffic to v2 and deactivate the older revision 
+- Specific revision can be directly accessed 
+- Done using a specific URL 
+
+
+## Replica 
+- Azure Container Apps can scale out automatically as needed 
+- Done by adding or removing replicas 
+- Each replica is an instance of a revision 
+- Replica provides the compute and memory for running the revision 
+- Upto 300 replicas per revision 
+
+
+## Underlying Components of Container Apps 
+- Azure Container apps use open source components for providing multiple services 
+- These components are optional and dont have to be used 
+- Add real value to the Container App deployed 
+- ![alt text](image-699.png)
+- Kubernetes (via KEDA)
+- Role: The core orchestration engine.
+- Details: Azure Container Apps runs on Kubernetes, managed by Azure, but you don’t interact with it directly (no kubectl needed). It uses KEDA (Kubernetes Event-Driven Autoscaling) to handle scaling based on events or metrics (e.g., HTTP traffic, queue length).
+- Why It Matters: You get Kubernetes’ robustness—pods, scheduling, networking—without managing clusters or nodes.
+- Example: A .NET app in a container scales up when HTTP requests spike, thanks to KEDA’s HTTP scaler.
+- Dapr (Distributed Application Runtime)
+- Role: Simplifies microservices development.
+- Details: Built-in support for Dapr, an open-source framework, provides features like service invocation, state management, pub/sub messaging, and secret management. 
+- Each Container App gets a Dapr sidecar (a companion container) if enabled.
+- Why It Matters: Makes it easy to build resilient, distributed apps without rewriting code for every platform.
+```c#
+ using Dapr.Client;
+using Microsoft.AspNetCore.Mvc;
+
+[ApiController]
+[Route("api/[controller]")]
+public class OrderController : ControllerBase
+{
+    private readonly DaprClient _daprClient;
+
+    public OrderController(DaprClient daprClient)
+    {
+        _daprClient = daprClient;
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> CreateOrder([FromBody] Order order)
+    {
+        // Publish to a message queue via Dapr
+        await _daprClient.PublishEventAsync("pubsub", "new-order", order);
+        return Ok("Order published");
+    }
+}
+
+public record Order(int Id, string Item);
+
+```
+- Envoy is an open-source, high-performance proxy designed for cloud-native applications. In Azure Container Apps, it serves as the ingress controller and plays a central role in managing external traffic and service-to-service communication.
+- What Envoy Does
+- HTTP Ingress:
+- Acts as the front door for external traffic, handling HTTPS termination, routing, and load balancing to your containerized apps.
+- Supports features like custom domains, TLS certificates (automatic or Bring Your Own), and traffic splitting (e.g., 70% to v1, 30% to v2).
+- Example: Your .NET app at myapp.westus.azurecontainerapps.io gets its HTTPS traffic routed by Envoy.
+- Service Mesh Lite (via Dapr):
+- When you enable Dapr in Container Apps, Envoy often works alongside Dapr’s sidecar to manage service-to-service communication.
+- Handles retries, timeouts, and circuit breaking for internal calls, enhancing resilience.
+- Example: A .NET microservice calling another via Dapr’s InvokeServiceAsync might route through Envoy under the hood.
+- Observability:
+- Generates logs and metrics (e.g., request latency, status codes) that feed into Azure Monitor/Log Analytics.
+- Example: You can trace a slow API call back to Envoy's logs.
+- Azure manages Envoy as part of the Container Apps Environment (the isolated boundary for your apps).
+- You don’t configure Envoy directly—Azure abstracts it, exposing only high-level settings (e.g., ingress rules in the Portal or CLI).
+- With Envoy in the mix, here’s the updated list of key components:
+
+- Kubernetes (via KEDA):
+Orchestrates containers, with KEDA driving event-based scaling (e.g., HTTP, queues).
+Envoy slots in as the ingress controller within this Kubernetes backbone.
+- Azure Container Instances (ACI):
+Provides the compute for running container workloads, likely hosting both app containers and Envoy instances.
+- Dapr (Distributed Application Runtime):
+Adds microservices capabilities (pub/sub, state, secrets).
+Works with Envoy for internal traffic management when Dapr is enabled.
+- Container Runtime:
+Executes your app’s container images (e.g., Docker-based).
+- Envoy Proxy:
+Manages ingress (external traffic) and potentially internal service mesh traffic with Dapr.
+Handles TLS, routing, and load balancing.
+- Container Apps Environment:
+A secure, VNet-backed boundary with shared resources (e.g., Envoy ingress, Log Analytics).
+- Observability (Azure Monitor + Log Analytics):
+Collects logs and metrics from Envoy, Dapr, and your app.
+- Storage and Secrets:
+Integrates Azure Files and Key Vault, often via Dapr.
+
+
+## Pricing of Container Apps 
+- Depends on the plan used 
+- There are only 2 plans: Consumption and Dedicated 
+- ![alt text](image-700.png)
+- ![alt text](image-701.png)
+- ![alt text](image-702.png)
+- ![alt text](image-703.png)
+
+## Running a Container App 
+- We will host a WorldTrip Application 
+- Its architecture is as follows: 
+- ![alt text](image-704.png)
+
+## Deploying Container Apps 
+- Container Apps always pulls docker image from registry 
+- Can be Azure Container Registry(ACR) or other public registries like Docker Hub, Github etc 
+- Deployment to Container Apps supports various scenarios 
+
+### Deploy Source Code to Registry 
+- Source code is manually packaged and pushed to container registry 
+- Container App is deployed, configured to pull the new repository 
+- Provides full control on the resources created 
+- ![alt text](image-705.png)
+
+### Deploy Source code directly to Container App 
+- Source code is directly deployed to container app 
+- A registry is automatically created as part of the process 
+- Quick and easy, though limited control on resources 
+- ![alt text](image-706.png)
+
+### Deploy Existing image to Container App 
+- An existing image is pulled by Container App 
+- Great for reusing images 
+- ![alt text](image-707.png)
+
+### Deployment Tools 
+- Deployment can be done by: 
+- Azure CLI 
+- Using VSCode extensions 
+- Cannot be done from Azure Portal 
+
+## Deploying the Container App 
+- Create a container registry 
+- ![alt text](image-708.png)
+- Build and push an image of the client app to ACR 
+- Use the following commands to build and push an image to ACR 
+```shell 
+az login 
+az group create --name MyResourceGroup --location eastus
+az acr create --resource-group MyResourceGroup --name MyContainerRegistry --sku Basic
+az acr login --name MyContainerRegistry
+docker build -t myimage:latest .
+docker tag myimage:latest MyContainerRegistry.azurecr.io/myimage:latest
+docker push MyContainerRegistry.azurecr.io/myimage:latest
+
+# Verify the image 
+az acr repository list --name MyContainerRegistry --output table
+
+```
+- Next, create a container app
+- ![alt text](image-709.png)
+- ![alt text](image-710.png)
+- ![alt text](image-711.png)
+- ![alt text](image-712.png)
+- Now container app is deployed 
+- ![alt text](image-713.png)
+- To deploy a container app directly from source code without creating an image first, use this command: 
+```shell 
+az containerapp up -n worldtripinfo --environment worldtrip-environment --source . --registry-server nishantworldtrip.azurecr.io -g worldtrip-rg --registry-username=nishantworldtrip --registry-password=Ld3rVa++M9PKBRfCOFXrpt/5EPIW9RUouHe5rwqdmK+ACRBqcsF0
+```
+- We can modify the URL to fetch the trips from the azure container app we just deployed inside the index.html file 
+- Now we need to create a new tag for this image and deploy it again 
+- Inside the container app, we need to create a new revision which will use the updated image 
+- ![alt text](image-714.png)
+- ![alt text](image-715.png)
+- ![alt text](image-716.png)
+- Note the revision has its own URL
+- ![alt text](image-717.png)
+- ![alt text](image-718.png)
+- The old revision is deactivated 
+- ![alt text](image-719.png)
+
+## Splitting Traffic with Revisions
+- ![alt text](image-720.png)
+- Activate the inactive revision with 50% traffic
+- ![alt text](image-721.png)
+- Now if we go to the main URL of the container app, open it and keep refreshing, we can see sometimes it will point to old revision and sometimes to new one 
+- ![alt text](image-722.png)
+
+## Deploy to Azure Container Apps with GitHub Actions
+- Azure Container Apps allows you to use GitHub Actions to publish revisions to your container app. As commits are pushed to your GitHub repository, a workflow is triggered which updates the container image in the container registry. 
+- Azure Container Apps creates a new revision based on the updated container image.
+- The GitHub Actions workflow is triggered by commits to a specific branch in your repository.
+-  When creating the workflow, you decide which branch triggers the workflow.
+```yaml
+ steps:
+
+  - name: Log in to Azure
+    uses: azure/login@v1
+    with:
+      creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+  - name: Build and deploy Container App
+    uses: azure/container-apps-deploy-action@v1
+    with:
+      appSourcePath: ${{ github.workspace }}/src
+      acrName: myregistry
+      containerAppName: my-container-app
+      resourceGroup: my-rg
+
+```
+- The action uses the Dockerfile in appSourcePath to build the container image. If no Dockerfile is found, the action attempts to build the container image from source code in appSourcePath.
+```yaml 
+ name: Azure Container Apps Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Log in to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Build and deploy Container App
+        uses: azure/container-apps-deploy-action@v1
+        with:
+          appSourcePath: ${{ github.workspace }}/src
+          acrName: <ACR_NAME>
+          containerAppName: my-container-app
+          resourceGroup: my-container-app-rg
+
+```
+
+## Autoscaling Container Apps 
+- Container apps can be scaled automatically 
+- Scaling is always per revision 
+- Scaling is done by adding or removing replicas for the revision 
+- Ensures there is enough compute power to handle incoming traffic 
+- Scaling can be configured based on various parameters 
+- We can scale to zero - no cost. 
+
+### Autoscaling Components
+- ![alt text](image-723.png)
+- Scaling Limits: Set the minimum and maximum number of replicas per revision 
+- ![alt text](image-724.png)
+- Scaling Rules: Define the trigger for scaling. 3 categories of triggers: 
+- HTTP, TCP, Custom Triggers 
+- ![alt text](image-725.png)
+- Scaling Behavior: Combines limits and rules 
+- Sets how rules are evaluated and how scale is executed i.e Polling interval, scale up steps etc. 
+- Usually should not be modified 
+- Can be done using the portal, CLI or ARM template 
+- Adding scaling configuration creates a new revision 
+- ![alt text](image-726.png)
+
+## Scaling with KEDA 
+- k8s event driven autoscaler 
+- scales k8s deployments based on events collected from various event sources 
+- Remember: Container apps are based on K8s 
+- Not related to Azure, integrated into Container Apps 
+
+## KEDA Concepts 
+- Event Source: External source monitored by KEDA: Examples: Azure Storage Queue, ActiveMQ, Memory etc. 
+- Provides metrics for KEDA to process 
+- Metrics are sent to Scaler 
+- Scalers: Component that receive metrics from event source 
+- Then decides whether a deployment should be scaled 
+- Currently there are more than 60 types of scalers 
+- Scaled Object/Scaled Job: Specification for describing how KEDA should scale deployments and which trigger to use. 
+- ![alt text](image-727.png)
+- Note the event source is Kafka
+
+## Using KEDA with Container Apps 
+- KEDA scalers can be used in Container Apps 
+- Using Custom scale rules 
+- Specifications are entered as metadata fields 
+- Authentication to resources is done using secrets 
+- i.e Connection Strings 
+- First create a storage account and create a storage queue inside it. This queue will act as the event source for KEDA 
+-  Add a new secret to container app 
+-  Copy the connection string for storage queue and add it as a secret in the container app 
+-  ![alt text](image-728.png)
+-  ![alt text](image-729.png)
+-  This is based on KEDA trigger specification for CPU scaler: 
+```yaml 
+ triggers:
+- type: cpu
+  metricType: Utilization # Allowed types are 'Utilization' or 'AverageValue'
+  metadata:
+    type: Utilization # Deprecated in favor of trigger.metricType; allowed types are 'Utilization' or 'AverageValue'
+    value: "60"
+    containerName: "" # Optional. You can use this to target a specific container in a pod
+
+```
+- We will add the storage queue based custom scaler like this:
+- ![alt text](image-735.png)
+- This is based on the KEDA trigger specification for Azure storage queue scaler:
+```yaml 
+ triggers:
+- type: azure-queue
+  metadata:
+    queueName: orders
+    queueLength: '5'
+    activationQueueLength: '50'
+    connectionFromEnv: STORAGE_CONNECTIONSTRING_ENV_NAME
+    accountName: storage-account-name
+    cloud: AzureUSGovernmentCloud
+
+```
+- Now a new revision is deployed with 2 custom scale rules
+- ![alt text](image-731.png)
+- Now we go to the storage queue and add 6 messages in the queue. Note that when we add the 6th message, it will trigger KEDA queue scaler rule
+- ![alt text](image-736.png) 
+- Now we can see 2 replicas of the container app running 
+- ![alt text](image-737.png)
+
+## Service Connectors 
+- It is often required to connect container apps to external services
+- In containerized apps—like those running on Docker or Kubernetes—service connectors are tools or configs that link your app to external services: databases (PostgreSQL, MongoDB), message queues (RabbitMQ), cloud storage (AWS S3), or APIs. 
+- Think of them as the plumbing—bridges that let containers, which are isolated by design, talk to the outside world securely and efficiently.
+- ![alt text](image-738.png)
+- Can be done in the regular way 
+- Setting up manually the connection string 
+- Defining authentication
+- Setting up managed identity 
+- And more. 
+- However this is cumbersome and error prone. 
+- Service connectors come to the rescue 
+- We can use service connector to create a fully configured connection to other services 
+- Add environment variables to the compute platform with all the necessary connection information 
+- The code just needs to reference the env variable and use it to connect to the service 
+- Service Connectors can be used from :
+- ![alt text](image-739.png)
+- ![alt text](image-740.png)
+- We will use service connector in the pricing service 
+- It will connect to Azure SQL to retrieve pricing information 
+- Connection to Azure SQL will be done using Service Connector 
+- We will first create a container app for worldtrip pricing project 
+- We will setup a worldtripdb database which will contain the table for the Tripprices. 
+- Our container app will connect to this database using service connectors 
+- ![alt text](image-741.png)
+- We can also validate the connection 
+- ![alt text](image-742.png)
+- Note it will add an environment variable AZURE_SQL_CONNECTIONSTRING
+- ![alt text](image-743.png)
+- Note that this environment variable takes it value from a secret 
+- Go to secrets and view the azure sql connection string secret which is a connection string stored in a secret(which is more secure)
+- ![alt text](image-744.png)
+- Service connectors make it easy to connect to other Azure Services. 
+
+## Developing Microservices with Dapr 
+- Manages service to service communication 
+- Provides additional services 
+- It is technology, platform and cloud agnostic. 
+- Can be used even if it used by a python based system 
+- Created by Microsoft 
+- Integrated into Container Apps 
+- It is a type of a service mesh.  
+
+
