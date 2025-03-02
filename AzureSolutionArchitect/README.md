@@ -4965,3 +4965,26 @@ Console.WriteLine($"Trending destination: {destinations[trending]}");
 
 ## Choosing the Data Platform 
 - ![alt text](image-801.png)
+- Azure SQL offers best SLA and best availability
+
+## Choosing the Messaging Platform 
+- ![alt text](image-802.png)
+
+## Implementing Security 
+- Restrict access to VMs and App Services
+- Use NSG 
+- Use encryption in data stores 
+- Use strong authentication
+
+## Implementing Logging and Monitoring
+- Utilize Alerts 
+- Use Application Insights, Azure Monitor, Log Analytics Workspace 
+- Create dashboards to visualize the system state 
+- Use application insights to gain insights into your app 
+
+## Azure Architecture Center 
+- Central hub for all things Azure architecture 
+- ![alt text](image-803.png)
+- ![alt text](image-804.png)
+
+## Case Studies
