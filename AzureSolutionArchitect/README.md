@@ -4560,4 +4560,408 @@ jobs:
 - Integrated into Container Apps 
 - It is a type of a service mesh.  
 
+## Problems solved by Service Mesh 
+- Microservices communicate between them a lot 
+- The communication cause a lot of problems and challenges:
+- Timeouts 
+- Security
+- Retries 
+- Monitoring 
+- Lets assume a system with 4 services 
+- ![alt text](image-745.png)
+- In the above diagram, whether it is timeout, error or communication over TCP, if we try to handle all of these scenarios within the service code itself, it will become cumbersome. 
+- Service Mesh is a collection of software components that sit near the service and manage all service-to-service communication. 
+- Provides all communication services
+- The service interacts with the service mesh only 
 
+### Services provided by Service Mesh 
+- Protocol conversion(can convert communication over RESTAPI to TCP )
+- Communication Security using Encryption 
+- Authentication using AD 
+- Reliability(using timeouts, retries, health checks, circuit breaking)
+- Monitoring 
+- Service Discovery(provides loose coupling)
+- Testing (A/B testing, traffic splitting)
+- Load Balancing(routing the requests to different instances of the service)
+
+### Circuit Breaker 
+- Prevent cascading failures when service fails 
+- ![alt text](image-746.png)
+- ![alt text](image-747.png)
+
+### In short, service's developers need not handle communication aspects when using Service Mesh 
+
+## Service Mesh Architecture 
+- We have Control Plane and Data Plane 
+- ![alt text](image-748.png)
+### Data Plane:
+- Definition: The data plane is responsible for handling the actual traffic between services.
+- Core Element: Sidecar Proxies
+- A lightweight proxy (e.g., Envoy, Linkerd Proxy) is deployed alongside each service instance, typically as a separate container in a pod (in Kubernetes).
+- The sidecar intercepts all inbound and outbound traffic to/from the service, managing communication without the service itself being aware of the mesh.
+- Functions:
+- Routing and load balancing
+- Encryption (e.g., mTLS for secure communication)
+- Retry logic, circuit breaking, and timeouts
+- Traffic splitting (e.g., for canary deployments or A/B testing)
+- Collecting telemetry data (metrics, logs, traces)
+
+### Control Plane:
+- Control Plane:
+- Definition: The control plane is the management layer that configures and coordinates the behavior of the data plane proxies.
+- Core Element: Centralized management software (e.g., Istio's istiod, Linkerd's control plane components).
+- Functions:
+- Defines and distributes policies and configurations to the sidecar proxies.
+- Manages service discovery (e.g., integrating with Kubernetes' service registry).
+- Handles security policies (e.g., issuing certificates for mTLS).
+- Aggregates telemetry data from proxies for observability.
+- Provides APIs or dashboards for administrators to define routing rules, policies, etc.
+
+### How it works 
+- Service Communication:
+- Instead of services communicating directly with each other, all traffic is routed through the sidecar proxies.
+- For example, Service A sends a request to Service B:
+- Service A → Proxy A (outbound) → Proxy B (inbound) → Service B.
+- The proxies handle the heavy lifting (e.g., retries, encryption, logging) transparently.
+- Injection of Sidecars:
+- In environments like Kubernetes, sidecar proxies are automatically injected into pods either manually or via an admission controller (e.g., Istio's sidecar injector).
+- Control Plane Interaction:
+- The control plane continuously communicates with the sidecar proxies to update configurations, enforce policies, and collect telemetry.
+
+```text 
+ +-------------------+       +-------------------+
+| Service A         |       | Service B         |
+|+-----------------+|       |+-----------------+|
+|| App Container   ||       || App Container   ||
+|+-----------------+|       |+-----------------+|
+|| Sidecar Proxy   ||<----->|| Sidecar Proxy   ||  <- Data Plane
+|+-----------------+|       |+-----------------+|
++-------------------+       +-------------------+
+         ^                          ^
+         |                          |
+         +--------------------------+
+                   Control Plane
+         (Policy, Config, Telemetry)
+
+```
+
+## Types of Service Mesh 
+- 2 main types 
+- In Process 
+- Sidecar 
+
+### In Process 
+- ![alt text](image-749.png)
+- Code for the mesh runs in the same process as the services code 
+- No inter process communication is required 
+
+### Sidecar 
+- Code for mesh is an out of service process component 
+- Here service code makes a network call to the service mesh component 
+- ![alt text](image-750.png)
+
+### Comparison between them 
+- In Process offers better performance as there are no network calls 
+- Side car advantage is platform agnostic 
+- Mesh code can be in Node.JS and services could be coded in .NET Core. 
+- ![alt text](image-751.png)
+- Always go for Sidecar 
+
+## Dapr components 
+- Add more capabilities to Dapr 
+- In addition to Service Mesh capabilities 
+- Represented as components 
+- Each component is responsible for a specific capability 
+- Capabilites are implemented using different underlying components 
+- Can be switched without changing component spec. 
+- ![alt text](image-752.png)
+- We can switch from Dynamo DB to Cosmos DB 
+- Nothing from the code point will change, we can just switch the implementation. 
+- Think of it as MassTransit
+- More like an abstraction 
+- To implement components we need a component Schema 
+
+### Component Schema 
+- YAML file defining the component 
+- Specifies the component type, authentication, metadata, scopes and more 
+- ![alt text](image-753.png)
+
+
+## Dapr in Container Apps 
+- Deeply integrated into Container Apps 
+- Different configuration between service invocation(Service Mesh) and components 
+### Service Invocation
+- Enabled on the container app 
+- Almost no change in code 
+- Allows tracing 
+- Easy to configure 
+
+### Dapr components 
+- Defined on the Environment Scope 
+- Attached to the relevant container apps 
+- Have slightly leaner schema 
+- ![alt text](image-754.png)
+- Components can define scopes 
+- Basically appId assigned to Container Apps 
+- Only container app with appId defined as scope can use the component 
+- Scope is optional though! 
+
+## Connecting the WorldTripPricing to the WorldTripInfo 
+- Look the following code: 
+- Note we are making a call from TripInfo API to the Pricing API using HttpClient 
+```c#
+ using System.Runtime.CompilerServices;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Add services to the container.
+// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+builder.Services.AddCors();
+
+var app = builder.Build();
+
+// Configure the HTTP request pipeline.
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+    app.UseCors(builder=>builder.WithOrigins("*"));
+}
+
+app.UseHttpsRedirection();
+
+var baseURL = (Environment.GetEnvironmentVariable("PRICING_API_URL") ?? "https://localhost:5002") + "/tripPricing/";
+
+var client = new HttpClient();
+// Adding app id as part of the header
+client.DefaultRequestHeaders.Add("dapr-app-id", "world-trip-pricing");
+
+
+app.MapGet("/tripInfo", async () =>
+{
+    var tripList = new List<TripInfo>
+        {
+            new(1, "Paris", "paris.jpg", GetTripPricing(1)),
+            new(2, "New York", "newyork.jpg", GetTripPricing(2)),
+            new(3, "Tokyo", "tokyo.jpg", GetTripPricing(3))           
+        };
+    return tripList;
+})
+.WithName("GetTripInfo")
+.WithOpenApi();
+
+app.Run();
+
+decimal GetTripPricing(int tripId)  {
+
+    var tripPricing=client.GetAsync(baseURL + tripId).Result.Content.ReadFromJsonAsync<TripPricing>().Result;
+    return tripPricing.Price;
+    
+
+}
+record TripInfo(int TripId,String Location, String PhotoUrl, decimal Price);
+
+record TripPricing(int TripId,decimal Price);
+
+
+```
+- Then we will deploy a new revision of the WorldTripInfo Container App with the updated code as above. 
+- If we try to run this code, it will not work as it will not find the Pricing_Api_Url. 
+- To fix this we will create another revision and define the environment variable for Pricing_Api_Url as below 
+- ![alt text](image-755.png)
+- Now it will work and WorldTripInfo container app will fetch the details from the WorldTripPricing Container app. 
+- But is it the best practice ?
+- Lets use Dapr here 
+- ![alt text](image-756.png)
+- ![alt text](image-757.png)
+- ![alt text](image-758.png)
+- Similar to worldtripInfo, we will also enable dapr for worldtrip pricing app 
+- ![alt text](image-759.png)
+- Remember in the above code we set the dapr-app-id to world-trip-pricing 
+- This will allow worldtripinfo dapr sidecar to discover and find the dapr sidecar for world-trip-pricing app. 
+- This will help them to connect. 
+- Dapr is installed as a sidecar and is available at localhost:3500 port 
+- ![alt text](image-760.png)
+- When we use dapr it will look at the dapr-app-id in the header and redirect and get info from the world-trip-pricing dapr sidecar. 
+- ![alt text](image-761.png)
+
+
+## Container App Jobs 
+- So far we have worked with web apps and API 
+- For this we used regular container apps 
+- These container apps listen to incoming requests and are always running. 
+- Container apps also support jobs 
+- Run for finite time and exit 
+- Also called Container App Jobs 
+- Great for data processing, machine learning, reporting and more. 
+
+### Job Triggers 
+- Container App jobs are triggered using the following trigger types 
+- ![alt text](image-762.png)
+### Cron Expressions 
+- Widely used to schedule operations 
+- Format can vary between vendors 
+- Specify the minute, hour, day of the month, month and day of the week 
+- Each element is indicated as a *(always), number, expression. 
+- Spaces between the elements 
+- 0 0 * * * (Every day at 00:00)
+- */5 * * * * (Every 5 minutes)
+- 0 * 4 * *  (At the beginning of every hour on the 4th day of the month)
+- 30 5 * * 1 (Every Monday at 5.30 AM)
+
+### Deploying Container App Jobs 
+- Shared same environment with the regular container apps 
+- Use the same network and logging 
+- Deployment is similar to regular container apps 
+
+### Limitations to Container App Jobs 
+- No revisions 
+- No Dapr support (communication with other container apps or APIs has to be direct URL based)
+- No ingress configuration (Remember, jobs donot receive incoming traffic)
+
+## Using Azure Container App Jobs 
+- We have the following code running inside a console application 
+```c#
+ // See https://aka.ms/new-console-template for more information
+var destinations = new List<String> { "Paris", "New York", "Tokyo" };
+var trending = new Random().Next(0, 3);
+Console.WriteLine($"Trending destination: {destinations[trending]}");
+```
+- Note that this is a console application not a web app. 
+- We will build and push an image of this code to the Azure Container Registry 
+- ![alt text](image-763.png)
+- Now we will deploy this code as a Container App Job 
+- ![alt text](image-764.png)
+- We will run this job every minute 
+- ![alt text](image-765.png)
+- ![alt text](image-766.png)
+- ![alt text](image-767.png)
+- We can see in the console logs that the job ran successfully 
+- ![alt text](image-768.png)
+
+
+## Securing Container Apps
+- Container Apps offer various mechanisms to improve security 
+- Same mechanisms found in other services
+- Improve network and access security 
+### Ingress
+- Controls incoming traffic to the container app 
+- By default allows external traffic with no limitations 
+- Can be set to allow only internal traffic i.e  between other container apps in the same environment 
+- For .e.g TripPricing API and TripInfo API can be allowed to communicate only with themselves in the same environment 
+- Great for services that should be called only from other services 
+- Can allow only specific IP addresses to access the service 
+- Similar to Access Restrictions in App Service  
+- Current we accept traffic from anywhere 
+- ![alt text](image-769.png)
+- We can change Ingress Traffic to container app environment 
+- ![alt text](image-770.png)
+- Note the URL has changed and it has internal inside it  
+- https://worldtrippricing.internal.wonderfulisland-12425134.westus2.azurecontainerapps.io
+
+### Authentication 
+- Authentication can be added to the container app 
+- Requires user authentication in order to access the app 
+- Support multiple identity providers 
+- Similar to authentication in App Services 
+- ![alt text](image-771.png)
+- ![alt text](image-772.png)
+- ![alt text](image-773.png)
+- ![alt text](image-774.png)
+- Now after adding the identity provider, we try to access the container app again, we are redirected to the sign-in page 
+- ![alt text](image-775.png)
+
+### Managed Identity 
+- Container Apps can have their own managed identity 
+- Can be used when accessing other resources such as database, keyvaults and more 
+- Used exactly the same as with other services 
+- ![alt text](image-776.png)
+- ![alt text](image-777.png)
+
+### Additional Security Controls 
+- Add Application Gateway + WAF in front of the Container App 
+- Use Existing Vnet, configure NSGs 
+- Store secrets in the Container App's secrets and not in code. 
+
+## Resiliency 
+- Various mechanisms are there in container app to remain available in case of regional failure, shutdown etc 
+- We can handle both error and zonal failures 
+- Container Apps can be deployed in multiple zones in a region to improve reliability
+- Replicas are distributed across the zones in the region 
+- Internal load balanver distributes traffic between zones 
+- When a zone goes down, replicas in other zones continue working 
+- Effective when there are more than 1 replica 
+- They also affect the cost(goes up !)
+- Availability Zones are configured on Environment level 
+- Cannot be changed once environment is deployed 
+- Requires a special Vnet.  
+- When we create a new container app, create a new environment 
+- ![alt text](image-778.png)
+- ![alt text](image-779.png)
+- Note that we deploy it across zones, a new Vnet is created with a new subnet(to communicate between zones) to manage synchronization between replicas across various zones
+  
+### Resiliency Policies 
+- Define behaviours of service-to-service communication 
+- Will not work when Dapr is enabled(coz Dapr takes care of everything)
+- Define timeouts, retries and more 
+- Easy to configure 
+- Per container app 
+- ![alt text](image-780.png)
+- ![alt text](image-781.png)
+- ![alt text](image-782.png)
+- ![alt text](image-783.png)
+
+### Dapr Resiliency Policies
+- Dapr has its own resiliency policies for service invocations
+- Cannot be configured in Container Apps 
+- These are baked into Dapr in Container App 
+- ![alt text](image-784.png)
+
+### Implementing DR 
+- Disaster recovery plan helps with a complete region shutdown
+- If our system needs to work in this scenario, a DR plan must be made 
+- Container apps is a regional service 
+- If region goes down, the container app also goes down 
+- So we can implement DR in Container App like this 
+- ![alt text](image-785.png)
+- ![alt text](image-786.png)
+- This will however double the cost of single deployment + Front Door cost(which is expensive)
+
+
+## Logging and Monitoring of Container Apps 
+- Container Apps have lot of moving parts such as revisions, replicas, code, containers and more.
+- We want to know how these parts are behaving 
+- Figure out if there is going to be a problem 
+- Report a problem 
+- Analyze Trends 
+- Logging and Monitoring help with that 
+- Based on Logs and Metrics in Azure 
+- Holds a lot of data about Container Apps status 
+- Allows setting alerts 
+- ![alt text](image-787.png)
+- ![alt text](image-788.png)
+- ![alt text](image-790.png)
+- ![alt text](image-791.png)
+- ![alt text](image-792.png)
+- ![alt text](image-793.png)
+- ![alt text](image-794.png)
+- ![alt text](image-795.png)
+- ![alt text](image-796.png)
+- ![alt text](image-797.png)
+
+
+## Architecting Apps for Azure 
+- Architecting for the cloud is different than classic Software Architecture
+- Two main differences:
+- Use existing services
+- ![alt text](image-798.png)
+- Consider cost 
+- ![alt text](image-799.png)
+
+## Choosing the Compute Platform 
+- ![alt text](image-800.png)
+
+## Choosing the Data Platform 
+- ![alt text](image-801.png)
