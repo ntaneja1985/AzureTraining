@@ -4988,3 +4988,166 @@ Console.WriteLine($"Trending destination: {destinations[trending]}");
 - ![alt text](image-804.png)
 
 ## Case Studies
+- ![alt text](image-805.png)
+
+## Dunderly (Paper Source)
+- Sells Paper Supplies
+- ![alt text](image-806.png)
+### Requirements 
+- Functional and Non-Functional Requirements 
+- ![alt text](image-807.png)
+- ![alt text](image-808.png)
+- ![alt text](image-810.png)
+- ![alt text](image-811.png)
+
+### Figure out the Data Volume 
+- ![alt text](image-812.png)
+- ![alt text](image-813.png)
+
+### Final Set of Requirements 
+- ![alt text](image-814.png)
+
+### Mapping the Components
+- We want to map one service to one entity 
+- ![alt text](image-815.png)
+### Messaging between Components
+- For Logging, we will use a Queue because it supports fire and forget mechanism.
+- Logging service pulls log records from queue and processes them 
+- ![alt text](image-816.png)
+
+### Logging Service 
+- Very important for a system with lot of services 
+- ![alt text](image-817.png)
+- Logging in Azure is implemented with 
+- Azure Log Analytics(Part of Azure Monitor and offers great integration with other services)
+- Handles huge amount of data 
+- Offers query language for analysis 
+- Can be streamed to log analytics tools like Power BI 
+- ![alt text](image-818.png)
+- Log analytics looks like this with KQL
+- ![alt text](image-819.png)
+- Cost of Log Analytics per month 
+- ![alt text](image-820.png)
+
+### View Service 
+- ![alt text](image-821.png)
+- This is a web app 
+- In this service we only have User Interface 
+- ![alt text](image-822.png)
+- Static websites can be implemented in Azure using either App Service or Static Web Apps 
+- ![alt text](image-823.png)
+- Monthly cost of App Service 
+- ![alt text](image-824.png)
+- Cost of Static Web App 
+- ![alt text](image-825.png)
+- Clearly Static Web Apps are more cost effective. 
+- Remember we dont need autoscaling and we dont have lot of concurrent users. 
+
+### Employees Service 
+- Allows end users to query employee's data 
+- Allows us to perform actions on data 
+- It doesnot allow us to display the data. Only CUD (Create, Update, Delete)
+- This will be a WebAPI 
+- We can use .NET Core. 
+- In Azure a webapi can be exposed either by App Service or Azure Function Apps 
+- ![alt text](image-827.png)
+- ![alt text](image-828.png)
+- We can go with App Services 
+- Cost of the App Service 
+- ![alt text](image-829.png)
+- Choosing a database 
+- ![alt text](image-830.png)
+- ![alt text](image-831.png)
+- ![alt text](image-832.png)
+- Architecture of this service 
+- ![alt text](image-833.png)
+- API should allow us to get full employee details by Id, List of employees by parameters 
+- Add Employee 
+- Update employee details 
+- Remove employee(soft delete only)
+- Add document 
+- Remove document 
+- Get document 
+- Search documents by parameters 
+- Do we need a separate Document Handler service? Since only Employee entity requires documents, so no. 
+- API should look like this 
+- ![alt text](image-834.png)
+- ![alt text](image-835.png)
+- Employee Service redundancy: we will use autoscale capability of App Services 
+- ![alt text](image-836.png)
+
+
+### Salary Service 
+- ![alt text](image-837.png)
+- This is a WebApi built using .NET Core
+- We can choose between App Service or Function Apps 
+- ![alt text](image-838.png)
+- Go with App Services here 
+- Classic 3 layer architecture 
+- API would do the following: 
+- Add Salary Requests 
+- Remove salary request 
+- Get salary request 
+- Approve salary request 
+- Reject salary request 
+- ![alt text](image-839.png)
+- Salary Service redundancy: we will use autoscale capability of App Services 
+
+
+### Vacation Service 
+- Allows employees to manage their vacation days 
+- Allows HR to set available vacation days for employees 
+- This is again a Web Api built using .NET Core 
+- This will again be an App Service with similar costs and autoscale capabilities.
+- ![alt text](image-840.png)
+- ![alt text](image-841.png)
+
+
+### Payment Interface 
+- ![alt text](image-842.png)
+- This inteface is basically a Service or Batch process running on a schedule
+- It will be built using .NET Core. 
+- We can choose between App Service WebJob and Function Apps 
+- ![alt text](image-843.png)
+- ![alt text](image-844.png)
+- Export of data can take lot of time. 
+- So we will go with App Service WebJobs 
+- ![alt text](image-846.png)
+- There is no redundancy for web jobs 
+- We need to manually add monitoring for catching failures 
+- ![alt text](image-847.png)
+- Architecture so far 
+- ![alt text](image-848.png)
+
+### Security
+- Data Encryption 
+- Network Security 
+- Access Restrictions 
+- ![alt text](image-849.png)
+- ![alt text](image-850.png)
+- ![alt text](image-851.png)
+- We need to add Application Gateway with WAF 
+- ![alt text](image-852.png)
+- This is expensive however. 
+- ![alt text](image-853.png)
+- Access Restrictions: Access to resources should be limited to allowed resources only. 
+- ![alt text](image-855.png)
+- Restrict access to App Service 
+- Add NSG rule to allow traffic from the App GW's Vnet 
+- ![alt text](image-856.png)
+- ![alt text](image-857.png)
+- Restrict access to Azure SQL 
+- Get outbound IP of the App Service 
+- Add firewall rule to the Azure Sql 
+- ![alt text](image-858.png)
+- ![alt text](image-859.png)
+- Restrict access to Storage Account 
+- ![alt text](image-860.png)
+- ![alt text](image-861.png)
+- Why cant we use Managed Identity or User Assigned Managed Identity in this case. 
+
+### Final Architecture 
+- ![alt text](image-862.png)
+- Total cost per month is 
+- ![alt text](image-863.png)
+- ![alt text](image-864.png)
