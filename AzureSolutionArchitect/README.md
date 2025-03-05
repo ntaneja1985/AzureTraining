@@ -5151,3 +5151,339 @@ Console.WriteLine($"Trending destination: {destinations[trending]}");
 - Total cost per month is 
 - ![alt text](image-863.png)
 - ![alt text](image-864.png)
+
+
+## Case Study #2 
+- Deals with Autonomous Cars 
+- ![alt text](image-866.png)
+
+### Requirements 
+- ![alt text](image-867.png)
+- ![alt text](image-868.png)
+
+### Questions we should ask the Customer
+- ![alt text](image-869.png)
+- ![alt text](image-870.png)
+
+### Calculating the Data Volume 
+- ![alt text](image-871.png)
+- We also need to consider the Retention Period
+- Also what happens to the data after retention period 
+- ![alt text](image-872.png)
+- Why we need retention period ?
+- ![alt text](image-873.png)
+- We need 2 types of data: 
+- ![alt text](image-874.png)
+- ![alt text](image-875.png)
+- If operational data is 1 week then 
+- ![alt text](image-876.png)
+- Max 4TB a week which we can store. 
+- ![alt text](image-877.png)
+
+### Mapping the Components
+- ![alt text](image-879.png)
+- We want to store aggregated data in a different data store: so we will store it in Data Warehouse 
+- Since retention period is 1 week, we will move data to Archive Db. 
+- We also need to figure out how the components will talk to each other. We will use TCP/IP protocol. Most IoT devices work with TCP/IP protocol as HTTP protocol is too verbose. 
+- When we move from OperationalDB to ArchiveDB , we will use ETL process
+- Remember for ETL we used to use Azure Data Factory. 
+- Azure's primary service for ETL is Azure Data Factory (ADF), a fully managed, cloud-based data integration platform. ADF enables you to create, schedule, and orchestrate ETL and ELT (Extract, Load, Transform) pipelines without needing to manage underlying infrastructure. 
+- It's not a BI tool itself but serves as the backbone for moving and transforming data, which can then feed into BI solutions like Power BI for analysis and visualization.
+- Key Features:
+- Connectors: Over 90 built-in, maintenance-free connectors for sources like SQL Server, Salesforce, SAP, and Amazon S3.
+- Data Flows: Code-free transformation with Mapping Data Flows, powered by Apache Spark, for scalable data processing.
+- Scalability: Serverless architecture that scales dynamically based on workload.
+- Integration: Works seamlessly with other Azure services, including Power BI, for downstream BI tasks.
+- ![alt text](image-880.png)
+
+### Telemetry Gateway 
+- Receives Telemetry data from cars using TCP 
+- Pushes the telemtry data to pipeline for further processing
+- It can either be a console app or service. 
+- It must handle huge load like 7000 msgs/sec 
+- Must offer great performance 
+- ![alt text](image-881.png)
+- We can go with Node.JS 
+- ![alt text](image-882.png)
+- Listeners in Azure for this kind of problem: 
+- ![alt text](image-883.png)
+- We can use a VM 
+- ![alt text](image-884.png)
+- However we have a problem with scaling. Scaling VMs is hard. 
+- So we can utilize VM Scalesets and Load Balancer. 
+- ![alt text](image-885.png)
+- ![alt text](image-886.png)
+- ![alt text](image-887.png)
+- In our case we only need service interface. 
+- Therefore Telemetry Gateway will be implemented with Load Balancer and VM Scale Sets. 
+
+### Telemetry Pipeline 
+- Gets the telemetry messages from the gateway 
+- Queues the telemetry for further processing 
+- Basically - a queue for streaming high volume data 
+- Remember this diagram 
+- ![alt text](image-889.png)
+- Event Hubs are designed for heavy loads 
+- ![alt text](image-890.png)
+- We will go with 7 throughput units(TUs). Each TU supports upto 1000 messages/second (and we will recieve 7000 messages/sec)
+
+
+### Telemetry Processor 
+- It receives messages from the pipeline
+- Processes the messages(mainly validation)
+- Stores the messages in a data store 
+- We need to determine the Azure service for both the processor and data store 
+- For Processing the messages, we can go with Azure Function Apps
+- ![alt text](image-891.png)
+- Cost would be very less 
+- ![alt text](image-892.png)
+- For data store we are looking for 
+- ![alt text](image-893.png)
+- We can go with Cosmos DB 
+- ![alt text](image-894.png)
+- Cosmos DB is quite costly 
+- ![alt text](image-895.png)
+- Event Hubs will automatically balance the load so we dont need 7000 RU/s 
+- ![alt text](image-896.png)
+- For the archive database we need to support huge amount of data 
+- ![alt text](image-897.png)
+- We can use Storage Account here and we can use Archive tier. 
+- ![alt text](image-898.png)
+- Pricing will look like this 
+- ![alt text](image-899.png)
+
+### Telemetry Viewer 
+- It allows end users to query telemetry data 
+- Displays real time data 
+- However, it doesnot analyze the data 
+- It will be Web App and Web Api 
+- We need backend and frontend 
+- For backend we will go with node.js and for front end we will go with React.js 
+- We can use App Service here for both 
+- ![alt text](image-900.png)
+- Cost is nominal 
+- ![alt text](image-901.png)
+- ![alt text](image-902.png)
+- API use cases are as follows: 
+- ![alt text](image-903.png)
+- ![alt text](image-904.png)
+- Redundancy is based on auto scaling feature of App Service. 
+
+### BI Application 
+- We want this application to analyze telemetry data and display custom reports about the data, trends, forecast etc. 
+- For e.g we want to know how many cars did break during the last month? 
+- What is the total distance the cars drove ?
+- BI Application is ALWAYS based on an existing tools 
+- Lot of BI tools out there 
+- ![alt text](image-905.png)
+- Designing BI solution is not part of architect's job, use a BI expert 
+- In Azure we have Power BI integration through Azure Synapse Analytics, Azure Data Lake Storage, Azure Cosmos DB, Azure SQL database. 
+
+### Security 
+- Pay attention to public accessible databases and unprotected access to App Service 
+- We need to block access to databases from unauthorized IP addresses 
+- Client can decide not to place WAF in front of App Service since it is a small service and offers only read-only operations and we want to save costs 
+
+
+### Final Architecture 
+- ![alt text](image-906.png)
+- Final cost 
+- ![alt text](image-907.png)
+- ![alt text](image-908.png)
+
+
+## Case Study 3
+- Grocecoll --> Grocery collection service 
+- ![alt text](image-909.png)
+- ![alt text](image-910.png)
+- ![alt text](image-911.png)
+- ![alt text](image-912.png)
+- ![alt text](image-913.png)
+
+### Data Volume 
+- 1 List = 500Kb 
+- 10000 lists /day = 5GB /day => 2TB /year 
+- ![alt text](image-914.png)
+
+### Mapping the Components 
+- ![alt text](image-915.png)
+
+### Messaging between the Components 
+- ![alt text](image-916.png)
+
+### Lists Receiver 
+- ![alt text](image-917.png)
+- Either a console or service 
+- Receiver code can be a Function App 
+- ![alt text](image-918.png)
+- ![alt text](image-919.png)
+- We can use Azure MySql Database 
+- ![alt text](image-920.png)
+- ![alt text](image-921.png)
+- ![alt text](image-922.png)
+
+### Lists Service 
+- ![alt text](image-923.png)
+- We can make it a web app that calls a webapi
+- We can go for App Service 
+- ![alt text](image-924.png)
+- We will implement 3 layer architecture 
+- ![alt text](image-925.png)
+- ![alt text](image-926.png)
+- ![alt text](image-927.png)
+
+### FrontEnd 
+- ![alt text](image-928.png)
+- We need to decide between Desktop WPF app or Web based(Electron or React Native)
+- ![alt text](image-929.png)
+- We can go for React Native 
+
+### Export Lists Data
+- ![alt text](image-930.png)
+- ![alt text](image-931.png)
+
+### Security 
+- Block access to database from unauthorized IP Addresses 
+- Here App Service is a small service with read only operations and we need to save costs 
+
+### Final Architecture 
+- ![alt text](image-932.png)
+- ![alt text](image-933.png)
+
+## Case Study #4 
+- PayRawl System 
+- ![alt text](image-934.png)
+
+### Requirements 
+- ![alt text](image-935.png)
+- ![alt text](image-936.png)
+- ![alt text](image-937.png)
+- ![alt text](image-938.png)
+- ![alt text](image-939.png)
+
+### Mapping the Components 
+- ![alt text](image-942.png)
+- Messaging between components is queue based 
+
+### File Handler
+- ![alt text](image-943.png)
+- It is either a console or a service 
+- We can go for Function Apps 
+- ![alt text](image-944.png)
+- Cost is 0 in the consumption tier: we have only 15000 executions per month 
+- ![alt text](image-945.png)
+- ![alt text](image-946.png)
+- We can go for .NET Core as its performance is better and .NET Core offers threading support also 
+
+
+### Queue 
+- ![alt text](image-947.png)
+- ![alt text](image-948.png)
+- We can go for Event Hubs 
+- ![alt text](image-949.png)
+- We just need 1 TU 
+- ![alt text](image-950.png)
+
+### File Formatter 
+- ![alt text](image-951.png)
+- Application will either be a console or a service 
+- We can again use Function Apps 
+- ![alt text](image-952.png)
+- Cost is 0 
+- ![alt text](image-953.png)
+
+### File Calculation Service 
+- ![alt text](image-954.png)
+- Similar to File Formatter so we can also use Azure Function apps and it will cost us 0 
+
+### File Exporter 
+- ![alt text](image-955.png)
+- Similar to File Calculation Service and we will use Azure Function Apps and it will cost us 0 
+
+### Logging Service 
+- ![alt text](image-956.png)
+- We can go for Azure log analytics 
+- ![alt text](image-957.png)
+- ![alt text](image-958.png)
+- Max retention period for Log Analytics is 2 years. 
+
+
+### Security 
+- System is internal only, so no substantial security risks 
+- We need to make sure data is encrypted and validated 
+- ![alt text](image-959.png)
+
+### Final Architecture 
+- ![alt text](image-960.png)
+- ![alt text](image-961.png)
+
+## Migrating to the Cloud 
+- ![alt text](image-962.png)
+- ![alt text](image-963.png)
+
+### Motivation Assessment 
+- Why we want to move to the cloud?
+- To save costs (Not always the case, sometimes cloud systems can cost more than on-premises, need to do thorough cost estimation)
+- To take advantantage of cloud capabilities(scalability, redundancy)-->But we need to make sure migrated system can use cloud capabilities
+Example: Legacy single session app that cannot be scaled will end up on a single VM just like on-prem 
+
+### Migration Strategies 
+- Lift and Shift (quickest but least efficient one)
+- ![alt text](image-965.png)
+- Refactoring 
+- ![alt text](image-966.png)
+- Rewrite (slowest but takes full advantage of all cloud services)
+- ![alt text](image-967.png)
+- ![alt text](image-964.png)
+- Comparison of cloud migration strategies 
+- ![alt text](image-968.png)
+- These migrations are often combined 
+- First do lift and shift and then start optimization. Some applications may be refactored and others may require rewriting as well. 
+
+
+### System Assessment 
+- We need to ask the right questions: 
+- ![alt text](image-969.png)
+- Answers dictate the migration strategy 
+- ![alt text](image-970.png)
+- ![alt text](image-971.png)
+- ![alt text](image-972.png)
+- We need to know a tool called **Azure Migrate** 
+- It is a central hub for assessing and migrating various resources 
+- It uses platform specific agents to discover the resources that can be migrated 
+- Provides migration recommendations 
+- It is free. 
+- ![alt text](image-973.png)
+- ![alt text](image-974.png)
+
+### Migration 
+- Time for the actual migration 
+- Lift and shift is the easiest strategy 
+- ![alt text](image-975.png)
+- Next is Refactor 
+- ![alt text](image-976.png)
+- Finally we have rewrite 
+- ![alt text](image-977.png)
+- For DB Migration, prefer managed version of the DB and not a VM  
+- Migration itself is better than DB's own tools and not via Azure migration services 
+
+### App Enhancements
+- Not necessarily code changes 
+- Main areas for improvements: 
+- Logging and Monitoring using Azure Monitor 
+- Network Protection using Application Gateway 
+- ![alt text](image-978.png)
+
+### Testing 
+- Testing in cloud is similar to on-prem 
+- Put strong emphasis on logging and monitoring 
+- Make sure you have access to system's data 
+- If system is auto-scaled or DRed- test these scenarios 
+- Check performance- might vary from the on-prem figures 
+- System might be slower in cloud compared to on-prem and opposite is also possible. 
+
+### Go Live 
+- Keep on eye on the costs 
+- Setup budget alerts 
+- Define tags for the various cloud services 
+- Look at the data atleast once a month  
